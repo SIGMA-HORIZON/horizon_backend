@@ -46,3 +46,8 @@ class NotifType(str, Enum):
     VM_STOPPED = "vm_stopped"
     VM_DELETED = "vm_deleted"
     ACCOUNT_SUSPENDED = "account_suspended"
+
+class AccountRequestStatus(str, Enum):
+    PENDING = "pending"
+    APPROVED = "approved"
+    REJECTED = "rejected"

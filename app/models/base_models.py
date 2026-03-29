@@ -6,7 +6,22 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 from sqlalchemy.dialects.postgresql import UUID, INET
 
 from app.db.base import Base
-from app.models.enums import RoleType, VMStatus, NodeStatus, OSType, SSHAlgorithm, ActionType, NotifType
+from app.models.enums import RoleType, VMStatus, NodeStatus, OSType, SSHAlgorithm, ActionType, NotifType, AccountRequestStatus
+
+class AccountRequest(Base):
+    __tablename__ = "account_requests"
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    email: Mapped[str] = mapped_column(String(255), nullable=False, index=True)
+    first_name: Mapped[str] = mapped_column(String(128), nullable=False)
+    last_name: Mapped[str] = mapped_column(String(128), nullable=False)
+    organisation: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
+    justification: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    status: Mapped[AccountRequestStatus] = mapped_column(Enum(AccountRequestStatus), default=AccountRequestStatus.PENDING, nullable=False)
+    submitted_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+    processed_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+    processed_by: Mapped[Optional[uuid.UUID]] = mapped_column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=True)
+    rejection_reason: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
 
 class Role(Base):
     __tablename__ = "roles"
@@ -28,6 +43,7 @@ class User(Base):
     email: Mapped[str] = mapped_column(String(255), unique=True, index=True, nullable=False)
     password_hash: Mapped[str] = mapped_column(String(255), nullable=False)
     is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
+    must_change_password: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     last_login: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
     suspended_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)

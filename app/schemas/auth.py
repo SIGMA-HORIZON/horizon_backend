@@ -12,3 +12,21 @@ class RegisterRequest(BaseModel):
 class RegisterRequestResponse(BaseModel):
     message: str = "Your request has been submitted and is pending admin review."
     request_id: str
+
+class LoginRequest(BaseModel):
+    email: EmailStr
+    password: str
+
+class TokenResponse(BaseModel):
+    access_token: str
+    token_type: str = "bearer"
+    expires_in: int
+    must_change_password: bool
+
+class LogoutResponse(BaseModel):
+    message: str = "Successfully logged out"
+
+class ChangePasswordRequest(BaseModel):
+    current_password: str
+    new_password: str
+    confirm_password: str

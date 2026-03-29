@@ -1,6 +1,7 @@
 from typing import List, Optional
 import uuid
 from sqlalchemy import select
+from sqlalchemy.orm import joinedload
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.models.base_models import User, Role
 from app.models.enums import RoleType
@@ -10,7 +11,12 @@ class UserRepository:
         self.db = db
 
     async def get_by_email(self, email: str) -> Optional[User]:
-        query = select(User).where(User.email == email)
+        query = select(User).options(joinedload(User.role)).where(User.email == email)
+        result = await self.db.execute(query)
+        return result.scalars().first()
+
+    async def get_by_username(self, username: str) -> Optional[User]:
+        query = select(User).options(joinedload(User.role)).where(User.username == username)
         result = await self.db.execute(query)
         return result.scalars().first()
 
@@ -29,3 +35,9 @@ class UserRepository:
         await self.db.commit()
         await self.db.refresh(user_in)
         return user_in
+
+    async def update(self, user: User) -> User:
+        self.db.add(user)
+        await self.db.commit()
+        await self.db.refresh(user)
+        return user
