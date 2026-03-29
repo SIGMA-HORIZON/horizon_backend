@@ -17,7 +17,7 @@ class AccountRequest(Base):
     last_name: Mapped[str] = mapped_column(String(128), nullable=False)
     organisation: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
     justification: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
-    status: Mapped[AccountRequestStatus] = mapped_column(Enum(AccountRequestStatus), default=AccountRequestStatus.PENDING, nullable=False)
+    status: Mapped[AccountRequestStatus] = mapped_column(Enum(AccountRequestStatus, values_callable=lambda x: [e.value for e in x]), default=AccountRequestStatus.PENDING, nullable=False)
     submitted_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
     processed_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
     processed_by: Mapped[Optional[uuid.UUID]] = mapped_column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=True)
@@ -27,7 +27,7 @@ class Role(Base):
     __tablename__ = "roles"
 
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    role_type: Mapped[RoleType] = mapped_column(Enum(RoleType), nullable=False, unique=True)
+    role_type: Mapped[RoleType] = mapped_column(Enum(RoleType, values_callable=lambda x: [e.value for e in x]), nullable=False, unique=True)
     description: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
 
     users: Mapped[List["User"]] = relationship(back_populates="role")
@@ -90,7 +90,7 @@ class PhysicalNode(Base):
 
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     hostname: Mapped[str] = mapped_column(String(64), unique=True, nullable=False)
-    status: Mapped[NodeStatus] = mapped_column(Enum(NodeStatus), default=NodeStatus.ONLINE, nullable=False)
+    status: Mapped[NodeStatus] = mapped_column(Enum(NodeStatus, values_callable=lambda x: [e.value for e in x]), default=NodeStatus.ONLINE, nullable=False)
     total_cpu_cores: Mapped[int] = mapped_column(Integer, nullable=False)
     total_ram_gb: Mapped[int] = mapped_column(Integer, nullable=False)
     total_disk_gb: Mapped[int] = mapped_column(Integer, nullable=False)
@@ -102,7 +102,7 @@ class ISOImage(Base):
 
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     name: Mapped[str] = mapped_column(String(128), nullable=False)
-    os_type: Mapped[OSType] = mapped_column(Enum(OSType), nullable=False)
+    os_type: Mapped[OSType] = mapped_column(Enum(OSType, values_callable=lambda x: [e.value for e in x]), nullable=False)
     version: Mapped[str] = mapped_column(String(64), nullable=False)
     proxmox_ref: Mapped[str] = mapped_column(String(255), unique=True, nullable=False)
     is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
@@ -114,7 +114,7 @@ class SSHKey(Base):
 
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     public_key: Mapped[str] = mapped_column(Text, nullable=False)
-    algorithm: Mapped[SSHAlgorithm] = mapped_column(Enum(SSHAlgorithm), default=SSHAlgorithm.ED25519, nullable=False)
+    algorithm: Mapped[SSHAlgorithm] = mapped_column(Enum(SSHAlgorithm, values_callable=lambda x: [e.value for e in x]), default=SSHAlgorithm.ED25519, nullable=False)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
     downloaded_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
 
@@ -131,7 +131,7 @@ class VirtualMachine(Base):
     ssh_key_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("ssh_keys.id"), unique=True, nullable=False)
     
     name: Mapped[str] = mapped_column(String(128), nullable=False)
-    status: Mapped[VMStatus] = mapped_column(Enum(VMStatus), default=VMStatus.PROVISIONING, nullable=False)
+    status: Mapped[VMStatus] = mapped_column(Enum(VMStatus, values_callable=lambda x: [e.value for e in x]), default=VMStatus.PROVISIONING, nullable=False)
     cpu_cores: Mapped[int] = mapped_column(Integer, nullable=False)
     ram_gb: Mapped[int] = mapped_column(Integer, nullable=False)
     disk_gb: Mapped[int] = mapped_column(Integer, nullable=False)
@@ -152,7 +152,7 @@ class AuditLog(Base):
 
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     user_id: Mapped[Optional[uuid.UUID]] = mapped_column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
-    action_type: Mapped[ActionType] = mapped_column(Enum(ActionType), nullable=False)
+    action_type: Mapped[ActionType] = mapped_column(Enum(ActionType, values_callable=lambda x: [e.value for e in x]), nullable=False)
     description: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     ip_address: Mapped[Optional[str]] = mapped_column(INET, nullable=True)
     success: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
@@ -165,7 +165,7 @@ class Notification(Base):
 
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     user_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
-    notif_type: Mapped[NotifType] = mapped_column(Enum(NotifType), nullable=False)
+    notif_type: Mapped[NotifType] = mapped_column(Enum(NotifType, values_callable=lambda x: [e.value for e in x]), nullable=False)
     message: Mapped[str] = mapped_column(Text, nullable=False)
     is_read: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     sent_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
