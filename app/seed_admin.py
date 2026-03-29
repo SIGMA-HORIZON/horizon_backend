@@ -15,13 +15,13 @@ async def seed_admin():
     async with AsyncSessionLocal() as session:
         async with session.begin():
             # 1. Vérifier si les rôles existent, sinon les créer
-            res = await session.execute(select(Role).where(Role.role_type == RoleType.ADMIN))
+            res = await session.execute(select(Role).where(Role.role_type == 'admin'))
             admin_role = res.scalars().first()
             
             if not admin_role:
                 print("Création des rôles de base...")
-                admin_role = Role(role_type=RoleType.ADMIN, description="Administrator")
-                user_role = Role(role_type=RoleType.USER, description="Standard User")
+                admin_role = Role(role_type='admin', description="Administrator")
+                user_role = Role(role_type='user', description="Standard User")
                 session.add_all([admin_role, user_role])
                 await session.flush() # Pour obtenir l'ID de l'admin_role
 
