@@ -20,9 +20,12 @@ COPY alembic.ini .
 COPY horizon ./horizon
 COPY scripts ./scripts
 
+RUN chmod +x /app/scripts/docker-entrypoint.sh
+
 EXPOSE 8000
 
+# PORT peut être 8000 (local) ou défini par Render
 HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
-    CMD curl -f http://localhost:8000/health || exit 1
+    CMD sh -c 'curl -f "http://127.0.0.1:${PORT:-8000}/health" || exit 1'
 
-CMD ["uvicorn", "horizon.main:app", "--host", "0.0.0.0", "--port", "8000", "--workers", "1"]
+CMD ["/app/scripts/docker-entrypoint.sh"]

@@ -67,6 +67,10 @@ def hash_pwd(plain: str) -> str:
 def seed():
     session = Session()
     try:
+        if session.query(Role).first() is not None:
+            print("Seed ignoré : la base contient déjà des données (rôles présents).")
+            return
+
         print("Seeding Horizon database...")
 
         # ------------------------------------------------------------------ ROLES

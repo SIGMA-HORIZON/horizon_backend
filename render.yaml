@@ -1,11 +1,7 @@
 # Horizon API — Blueprint Render
-# Plan gratuit : pas de preDeployCommand sur Render — migrations au démarrage du conteneur
-# (alembic upgrade head && uvicorn), idempotent si le schéma est déjà à jour.
-#
-# Seed (données de démo) : Render ne propose pas de conteneur « one-shot » comme
-# Docker Compose. Un worker relancerait le script à chaque sortie → doublons.
-# Après le premier déploiement réussi : Dashboard → service horizon-api → Shell :
-#   cd /app && python scripts/seed.py
+# Plan gratuit : pas de preDeployCommand — migrations + seed au démarrage via
+# scripts/docker-entrypoint.sh (évite le bug Render où sh -c "..." est mal parsé).
+# Seed : idempotent si des rôles existent déjà. Désactiver : HORIZON_AUTO_SEED=false.
 #
 # Prérequis : branche par défaut du dépôt contenant ce fichier (pas de repo URL
 # obligatoire si le Blueprint est créé depuis ce repo Git).
@@ -24,8 +20,8 @@ services:
     region: oregon
     plan: free
     dockerfilePath: ./Dockerfile
-    # Render injecte PORT. Migrations puis API (requis plan free, sans pre-deploy).
-    dockerCommand: sh -c "alembic upgrade head && exec uvicorn horizon.main:app --host 0.0.0.0 --port $PORT --workers 1"
+    # Un seul exécutable : pas de guillemets cassés côté plateforme (voir Dockerfile CMD).
+    dockerCommand: /app/scripts/docker-entrypoint.sh
     healthCheckPath: /health
     envVars:
       - key: DATABASE_URL
