@@ -1,5 +1,6 @@
 # Horizon API — Blueprint Render
-# Équivalent fonctionnel : Postgres + migrations (pre-deploy) + API.
+# Plan gratuit : pas de preDeployCommand sur Render — migrations au démarrage du conteneur
+# (alembic upgrade head && uvicorn), idempotent si le schéma est déjà à jour.
 #
 # Seed (données de démo) : Render ne propose pas de conteneur « one-shot » comme
 # Docker Compose. Un worker relancerait le script à chaque sortie → doublons.
@@ -23,10 +24,8 @@ services:
     region: oregon
     plan: free
     dockerfilePath: ./Dockerfile
-    # Render injecte PORT ; le Dockerfile écoute sur 8000 par défaut.
-    dockerCommand: uvicorn horizon.main:app --host 0.0.0.0 --port $PORT --workers 1
-    # Même image que l’API : Alembic lit DATABASE_URL (env.py).
-    preDeployCommand: alembic upgrade head
+    # Render injecte PORT. Migrations puis API (requis plan free, sans pre-deploy).
+    dockerCommand: sh -c "alembic upgrade head && exec uvicorn horizon.main:app --host 0.0.0.0 --port $PORT --workers 1"
     healthCheckPath: /health
     envVars:
       - key: DATABASE_URL
