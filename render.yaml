@@ -1,0 +1,47 @@
+# Horizon API — Blueprint Render
+# Équivalent fonctionnel : Postgres + migrations (pre-deploy) + API.
+#
+# Seed (données de démo) : Render ne propose pas de conteneur « one-shot » comme
+# Docker Compose. Un worker relancerait le script à chaque sortie → doublons.
+# Après le premier déploiement réussi : Dashboard → service horizon-api → Shell :
+#   cd /app && python scripts/seed.py
+#
+# Prérequis : branche par défaut du dépôt contenant ce fichier (pas de repo URL
+# obligatoire si le Blueprint est créé depuis ce repo Git).
+
+databases:
+  - name: horizon-db
+    region: oregon
+    plan: free
+    databaseName: horizon_db
+    user: horizon_user
+
+services:
+  - type: web
+    name: horizon-api
+    runtime: docker
+    region: oregon
+    plan: free
+    dockerfilePath: ./Dockerfile
+    # Render injecte PORT ; le Dockerfile écoute sur 8000 par défaut.
+    dockerCommand: uvicorn horizon.main:app --host 0.0.0.0 --port $PORT --workers 1
+    # Même image que l’API : Alembic lit DATABASE_URL (env.py).
+    preDeployCommand: alembic upgrade head
+    healthCheckPath: /health
+    envVars:
+      - key: DATABASE_URL
+        fromDatabase:
+          name: horizon-db
+          property: connectionString
+      - key: PYTHONPATH
+        value: /app
+      - key: APP_ENV
+        value: production
+      - key: APP_DEBUG
+        value: "false"
+      - key: APP_SECRET_KEY
+        generateValue: true
+      - key: JWT_SECRET_KEY
+        generateValue: true
+      - key: EMAIL_MODE
+        value: mock
