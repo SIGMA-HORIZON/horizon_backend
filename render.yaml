@@ -1,0 +1,42 @@
+# Horizon API — Blueprint Render
+# Plan gratuit : pas de preDeployCommand — migrations + seed au démarrage via
+# scripts/docker-entrypoint.sh (évite le bug Render où sh -c "..." est mal parsé).
+# Seed : idempotent si des rôles existent déjà. Désactiver : HORIZON_AUTO_SEED=false.
+#
+# Prérequis : branche par défaut du dépôt contenant ce fichier (pas de repo URL
+# obligatoire si le Blueprint est créé depuis ce repo Git).
+
+databases:
+  - name: horizon-db
+    region: oregon
+    plan: free
+    databaseName: horizon_db
+    user: horizon_user
+
+services:
+  - type: web
+    name: horizon-api
+    runtime: docker
+    region: oregon
+    plan: free
+    dockerfilePath: ./Dockerfile
+    # Un seul exécutable : pas de guillemets cassés côté plateforme (voir Dockerfile CMD).
+    dockerCommand: /app/scripts/docker-entrypoint.sh
+    healthCheckPath: /health
+    envVars:
+      - key: DATABASE_URL
+        fromDatabase:
+          name: horizon-db
+          property: connectionString
+      - key: PYTHONPATH
+        value: /app
+      - key: APP_ENV
+        value: production
+      - key: APP_DEBUG
+        value: "false"
+      - key: APP_SECRET_KEY
+        generateValue: true
+      - key: JWT_SECRET_KEY
+        generateValue: true
+      - key: EMAIL_MODE
+        value: mock
