@@ -1,0 +1,1 @@
+export const waLink ="https://wa.me/237690914045?text=Bonjour FiNgou Tech ! Je voudrais en savoir plus sur vos services. Merci ";

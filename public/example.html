@@ -1,0 +1,2100 @@
+<style>
+    * {
+        box-sizing: border-box;
+        margin: 0;
+        padding: 0;
+        font-family: 'Segoe UI', system-ui, sans-serif
+    }
+
+    :root {
+        --g1-dark: #0D1B2A;
+        --g1-nav: #1B2E44;
+        --g1-accent: #2563EB;
+        --g1-accent2: #3B82F6;
+        --g1-surface: #F4F6F9;
+        --g1-border: #DDE2EB;
+        --g1-text: #1E293B;
+        --g1-muted: #64748B;
+        --g1-on: #22C55E;
+        --g1-warn: #F59E0B;
+        --g1-err: #EF4444;
+        --g1-off: #94A3B8;
+        --g1-card: #FFFFFF;
+        --g1-tag: #EFF6FF;
+        --g1-tag-text: #1D4ED8;
+    }
+
+    body {
+        background: var(--g1-surface);
+        color: var(--g1-text);
+        height: 100vh;
+        min-height: 700px
+    }
+
+    .shell {
+        display: flex;
+        height: 100vh;
+        min-height: 700px
+    }
+
+    /* SIDEBAR */
+    .sidebar {
+        width: 230px;
+        min-width: 230px;
+        background: var(--g1-dark);
+        display: flex;
+        flex-direction: column
+    }
+
+    .logo-wrap {
+        padding: 18px 16px 14px;
+        border-bottom: 1px solid rgba(255, 255, 255, .08)
+    }
+
+    .logo-mark {
+        display: flex;
+        align-items: center;
+        gap: 9px
+    }
+
+    .logo-box {
+        width: 28px;
+        height: 28px;
+        background: var(--g1-accent);
+        border-radius: 6px;
+        display: flex;
+        align-items: center;
+        justify-content: center
+    }
+
+    .logo-box svg {
+        width: 16px;
+        height: 16px;
+        stroke: #fff;
+        fill: none;
+        stroke-width: 2.5
+    }
+
+    .logo-name {
+        font-size: 16px;
+        font-weight: 700;
+        color: #fff;
+        letter-spacing: .3px
+    }
+
+    .logo-sub {
+        font-size: 10px;
+        color: rgba(255, 255, 255, .35);
+        margin-top: 1px;
+        letter-spacing: .8px
+    }
+
+    .nav-wrap {
+        flex: 1;
+        overflow-y: auto;
+        padding: 10px 0
+    }
+
+    .nav-group {
+        margin-bottom: 4px
+    }
+
+    .nav-group-label {
+        font-size: 9px;
+        font-weight: 600;
+        color: rgba(255, 255, 255, .3);
+        letter-spacing: 1.4px;
+        padding: 10px 16px 4px;
+        text-transform: uppercase
+    }
+
+    .nav-item {
+        display: flex;
+        align-items: center;
+        gap: 9px;
+        padding: 8px 16px;
+        cursor: pointer;
+        font-size: 12px;
+        color: rgba(255, 255, 255, .6);
+        border-left: 2px solid transparent;
+        transition: background .12s, color .12s
+    }
+
+    .nav-item:hover {
+        background: rgba(255, 255, 255, .05);
+        color: rgba(255, 255, 255, .9)
+    }
+
+    .nav-item.active {
+        background: rgba(37, 99, 235, .18);
+        border-left-color: var(--g1-accent2);
+        color: #fff;
+        font-weight: 600
+    }
+
+    .nav-item svg {
+        width: 14px;
+        height: 14px;
+        stroke: currentColor;
+        fill: none;
+        stroke-width: 2;
+        flex-shrink: 0
+    }
+
+    .nav-vm-list {
+        padding: 0 0 0 38px
+    }
+
+    .vm-tree-item {
+        display: flex;
+        align-items: center;
+        gap: 7px;
+        padding: 5px 12px 5px 0;
+        cursor: pointer;
+        font-size: 11px;
+        color: rgba(255, 255, 255, .5);
+        transition: color .12s
+    }
+
+    .vm-tree-item:hover {
+        color: rgba(255, 255, 255, .85)
+    }
+
+    .vm-tree-item.active {
+        color: #fff;
+        font-weight: 600
+    }
+
+    .vm-dot {
+        width: 7px;
+        height: 7px;
+        border-radius: 50%;
+        flex-shrink: 0
+    }
+
+    .vm-dot.on {
+        background: var(--g1-on)
+    }
+
+    .vm-dot.off {
+        background: var(--g1-off)
+    }
+
+    .vm-dot.warn {
+        background: var(--g1-warn)
+    }
+
+    .sidebar-footer {
+        padding: 0;
+        border-top: 1px solid rgba(255, 255, 255, .08)
+    }
+
+    .user-row {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        padding: 12px 14px;
+        cursor: pointer;
+        transition: background .15s;
+        border-bottom: 1px solid rgba(255, 255, 255, .06)
+    }
+
+    .user-row:hover {
+        background: rgba(255, 255, 255, .04)
+    }
+
+    .user-av {
+        width: 32px;
+        height: 32px;
+        border-radius: 50%;
+        background: linear-gradient(135deg, var(--g1-accent), #3B82F6);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 11px;
+        font-weight: 700;
+        color: #fff;
+        flex-shrink: 0;
+        box-shadow: 0 0 0 2px rgba(59, 130, 246, .3)
+    }
+
+    .user-name {
+        font-size: 12px;
+        color: #fff;
+        font-weight: 600
+    }
+
+    .user-role {
+        font-size: 10px;
+        color: rgba(255, 255, 255, .4);
+        margin-top: 1px
+    }
+
+    .user-row-chevron {
+        margin-left: auto;
+        color: rgba(255, 255, 255, .2)
+    }
+
+    .user-row-chevron svg {
+        width: 13px;
+        height: 13px;
+        stroke: currentColor;
+        fill: none;
+        stroke-width: 2
+    }
+
+    .logout-btn {
+        display: flex;
+        align-items: center;
+        gap: 9px;
+        width: 100%;
+        padding: 10px 14px;
+        border: none;
+        background: transparent;
+        color: rgba(255, 255, 255, .35);
+        font-size: 12px;
+        cursor: pointer;
+        transition: background .15s, color .15s;
+        text-align: left
+    }
+
+    .logout-btn:hover {
+        background: rgba(239, 68, 68, .1);
+        color: #FCA5A5
+    }
+
+    .logout-btn svg {
+        width: 14px;
+        height: 14px;
+        stroke: currentColor;
+        fill: none;
+        stroke-width: 2;
+        flex-shrink: 0
+    }
+
+    /* PROFILE PAGE */
+    .profile-header {
+        background: linear-gradient(135deg, #1E3A5F 0%, #0F2241 100%);
+        border: 1px solid var(--g1-border);
+        border-radius: 12px;
+        padding: 28px 28px 24px;
+        margin-bottom: 18px;
+        display: flex;
+        align-items: center;
+        gap: 20px;
+        position: relative;
+        overflow: hidden
+    }
+
+    .profile-header::before {
+        content: '';
+        position: absolute;
+        top: -40px;
+        right: -40px;
+        width: 160px;
+        height: 160px;
+        border-radius: 50%;
+        background: rgba(37, 99, 235, .15);
+        pointer-events: none
+    }
+
+    .profile-av-lg {
+        width: 60px;
+        height: 60px;
+        border-radius: 50%;
+        background: linear-gradient(135deg, var(--g1-accent), #3B82F6);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 22px;
+        font-weight: 700;
+        color: #fff;
+        flex-shrink: 0;
+        box-shadow: 0 0 0 3px rgba(59, 130, 246, .35), 0 0 24px rgba(37, 99, 235, .3)
+    }
+
+    .profile-hdr-info h2 {
+        font-size: 18px;
+        font-weight: 700;
+        color: #fff;
+        margin-bottom: 3px
+    }
+
+    .profile-hdr-info p {
+        font-size: 12px;
+        color: rgba(255, 255, 255, .55)
+    }
+
+    .profile-hdr-badge {
+        display: inline-flex;
+        align-items: center;
+        gap: 5px;
+        background: rgba(37, 99, 235, .3);
+        border: 1px solid rgba(59, 130, 246, .4);
+        color: #93C5FD;
+        font-size: 10px;
+        font-weight: 600;
+        padding: 2px 10px;
+        border-radius: 20px;
+        margin-top: 6px;
+        letter-spacing: .5px
+    }
+
+    .profile-grid {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 16px;
+        margin-bottom: 18px
+    }
+
+    .profile-card {
+        background: var(--g1-card);
+        border: 1px solid var(--g1-border);
+        border-radius: 10px;
+        overflow: hidden
+    }
+
+    .profile-card-hdr {
+        padding: 12px 16px;
+        border-bottom: 1px solid var(--g1-border);
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        font-size: 12px;
+        font-weight: 600;
+        color: var(--g1-text)
+    }
+
+    .profile-card-hdr svg {
+        width: 14px;
+        height: 14px;
+        stroke: var(--g1-accent);
+        fill: none;
+        stroke-width: 2
+    }
+
+    .profile-field {
+        padding: 8px 16px;
+        border-bottom: 1px solid #F8FAFD;
+        display: flex;
+        flex-direction: column;
+        gap: 2px
+    }
+
+    .profile-field:last-child {
+        border-bottom: none
+    }
+
+    .profile-field label {
+        font-size: 10px;
+        font-weight: 600;
+        color: var(--g1-muted);
+        text-transform: uppercase;
+        letter-spacing: .6px
+    }
+
+    .profile-field span {
+        font-size: 13px;
+        color: var(--g1-text);
+        font-weight: 500
+    }
+
+    .profile-field input {
+        font-size: 13px;
+        color: var(--g1-text);
+        border: 1px solid var(--g1-border);
+        border-radius: 5px;
+        padding: 5px 9px;
+        background: #F8FAFD;
+        width: 100%;
+        outline: none;
+        transition: border-color .15s
+    }
+
+    .profile-field input:focus {
+        border-color: var(--g1-accent)
+    }
+
+    .profile-card-full {
+        grid-column: 1/-1
+    }
+
+    .profile-actions {
+        display: flex;
+        gap: 10px;
+        margin-top: 4px
+    }
+
+    .btn-danger {
+        background: transparent;
+        color: #EF4444;
+        border: 1px solid #FECACA;
+        padding: 7px 16px;
+        border-radius: 6px;
+        font-size: 12px;
+        font-weight: 600;
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        transition: background .15s, color .15s
+    }
+
+    .btn-danger:hover {
+        background: #FEF2F2;
+        border-color: #EF4444
+    }
+
+    .btn-danger svg {
+        width: 13px;
+        height: 13px;
+        stroke: currentColor;
+        fill: none;
+        stroke-width: 2
+    }
+
+    /* LOGOUT CONFIRM MODAL */
+    .logout-modal-bg {
+        display: none;
+        position: fixed;
+        inset: 0;
+        background: rgba(13, 27, 42, .6);
+        z-index: 300;
+        align-items: center;
+        justify-content: center;
+        backdrop-filter: blur(3px)
+    }
+
+    .logout-modal-bg.open {
+        display: flex
+    }
+
+    .logout-modal {
+        background: #fff;
+        border-radius: 12px;
+        padding: 28px;
+        width: 360px;
+        border: 1px solid var(--g1-border);
+        text-align: center;
+        box-shadow: 0 24px 64px rgba(0, 0, 0, .2)
+    }
+
+    .logout-icon {
+        width: 52px;
+        height: 52px;
+        background: #FEF2F2;
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        margin: 0 auto 16px
+    }
+
+    .logout-icon svg {
+        width: 24px;
+        height: 24px;
+        stroke: #EF4444;
+        fill: none;
+        stroke-width: 2
+    }
+
+    .logout-modal h3 {
+        font-size: 16px;
+        font-weight: 700;
+        color: var(--g1-text);
+        margin-bottom: 6px
+    }
+
+    .logout-modal p {
+        font-size: 13px;
+        color: var(--g1-muted);
+        line-height: 1.55;
+        margin-bottom: 22px
+    }
+
+    .logout-modal-btns {
+        display: flex;
+        gap: 10px;
+        justify-content: center
+    }
+
+    /* TOPBAR */
+    .topbar {
+        background: var(--g1-card);
+        border-bottom: 1px solid var(--g1-border);
+        padding: 0 22px;
+        height: 52px;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        flex-shrink: 0
+    }
+
+    .search-box {
+        display: flex;
+        align-items: center;
+        gap: 7px;
+        background: var(--g1-surface);
+        border: 1px solid var(--g1-border);
+        border-radius: 6px;
+        padding: 5px 12px;
+        font-size: 12px;
+        color: var(--g1-muted);
+        min-width: 220px
+    }
+
+    .search-box svg {
+        width: 12px;
+        height: 12px;
+        stroke: currentColor;
+        fill: none;
+        stroke-width: 2
+    }
+
+    .topbar-right {
+        display: flex;
+        align-items: center;
+        gap: 10px
+    }
+
+    .status-pill {
+        display: flex;
+        align-items: center;
+        gap: 5px;
+        font-size: 11px;
+        background: #F0FDF4;
+        color: #166534;
+        border: 1px solid #BBF7D0;
+        padding: 3px 10px;
+        border-radius: 20px;
+        font-weight: 600
+    }
+
+    .status-dot {
+        width: 6px;
+        height: 6px;
+        border-radius: 50%;
+        background: #22C55E
+    }
+
+    .btn-accent {
+        background: var(--g1-accent);
+        color: #fff;
+        border: none;
+        padding: 6px 14px;
+        border-radius: 6px;
+        font-size: 12px;
+        font-weight: 600;
+        cursor: pointer
+    }
+
+    .btn-ghost {
+        background: transparent;
+        color: var(--g1-muted);
+        border: 1px solid var(--g1-border);
+        padding: 6px 12px;
+        border-radius: 6px;
+        font-size: 12px;
+        cursor: pointer
+    }
+
+    /* MAIN */
+    .main {
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+        overflow: hidden
+    }
+
+    .content {
+        flex: 1;
+        overflow-y: auto;
+        padding: 20px 22px;
+        background: var(--g1-surface)
+    }
+
+    .page {
+        display: none
+    }
+
+    .page.active {
+        display: block
+    }
+
+    /* WELCOME BANNER */
+    .welcome {
+        background: var(--g1-card);
+        border: 1px solid var(--g1-border);
+        border-radius: 10px;
+        padding: 20px 24px;
+        margin-bottom: 18px;
+        display: flex;
+        align-items: center;
+        justify-content: space-between
+    }
+
+    .welcome-left h2 {
+        font-size: 17px;
+        font-weight: 700;
+        color: var(--g1-text);
+        margin-bottom: 3px
+    }
+
+    .welcome-left p {
+        font-size: 12px;
+        color: var(--g1-muted)
+    }
+
+    .welcome-right {
+        display: flex;
+        gap: 10px
+    }
+
+    /* VM QUICK STATUS ROW */
+    .vm-status-row {
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: 12px;
+        margin-bottom: 18px
+    }
+
+    .vm-status-card {
+        background: var(--g1-card);
+        border: 1px solid var(--g1-border);
+        border-radius: 10px;
+        padding: 14px 16px;
+        cursor: pointer;
+        transition: border-color .15s
+    }
+
+    .vm-status-card:hover {
+        border-color: var(--g1-accent2)
+    }
+
+    .vm-status-card.selected {
+        border-color: var(--g1-accent);
+        border-width: 2px
+    }
+
+    .vsc-top {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        margin-bottom: 8px
+    }
+
+    .vsc-name {
+        font-size: 13px;
+        font-weight: 600;
+        color: var(--g1-text)
+    }
+
+    .vsc-id {
+        font-size: 10px;
+        color: var(--g1-muted);
+        margin-top: 2px
+    }
+
+    .vsc-meta {
+        font-size: 11px;
+        color: var(--g1-muted);
+        margin-top: 6px
+    }
+
+    .badge {
+        display: inline-flex;
+        align-items: center;
+        gap: 4px;
+        font-size: 10px;
+        font-weight: 600;
+        padding: 2px 7px;
+        border-radius: 10px
+    }
+
+    .badge-on {
+        background: #F0FDF4;
+        color: #166534;
+        border: 1px solid #BBF7D0
+    }
+
+    .badge-off {
+        background: #F8FAFC;
+        color: #64748B;
+        border: 1px solid #E2E8F0
+    }
+
+    .badge-warn {
+        background: #FFFBEB;
+        color: #92400E;
+        border: 1px solid #FDE68A
+    }
+
+    .badge-blue {
+        background: var(--g1-tag);
+        color: var(--g1-tag-text);
+        border: 1px solid #BFDBFE
+    }
+
+    .badge-err {
+        background: #FEF2F2;
+        color: #991B1B;
+        border: 1px solid #FECACA
+    }
+
+    /* VM PANEL (Proxmox-style) */
+    .vm-panel {
+        background: var(--g1-card);
+        border: 1px solid var(--g1-border);
+        border-radius: 10px;
+        overflow: hidden
+    }
+
+    .vm-panel-hdr {
+        padding: 14px 18px;
+        border-bottom: 1px solid var(--g1-border);
+        display: flex;
+        align-items: center;
+        justify-content: space-between
+    }
+
+    .vm-panel-title {
+        font-size: 14px;
+        font-weight: 600;
+        color: var(--g1-text)
+    }
+
+    .vm-panel-meta {
+        font-size: 11px;
+        color: var(--g1-muted);
+        margin-top: 2px
+    }
+
+    .vm-actions {
+        display: flex;
+        gap: 6px
+    }
+
+    .btn-vm {
+        border: 1px solid var(--g1-border);
+        background: transparent;
+        color: var(--g1-text);
+        font-size: 11px;
+        padding: 5px 10px;
+        border-radius: 5px;
+        cursor: pointer;
+        font-weight: 500;
+        display: flex;
+        align-items: center;
+        gap: 4px
+    }
+
+    .btn-vm svg {
+        width: 12px;
+        height: 12px;
+        stroke: currentColor;
+        fill: none;
+        stroke-width: 2
+    }
+
+    .btn-vm-start {
+        border-color: #BBF7D0;
+        color: #166534;
+        background: #F0FDF4
+    }
+
+    .btn-vm-stop {
+        border-color: #FECACA;
+        color: #991B1B;
+        background: #FEF2F2
+    }
+
+    .btn-vm-console {
+        border-color: #BFDBFE;
+        color: #1D4ED8;
+        background: var(--g1-tag)
+    }
+
+    /* VM TABS */
+    .vm-tabs {
+        display: flex;
+        gap: 0;
+        border-bottom: 1px solid var(--g1-border);
+        overflow-x: auto;
+        padding: 0 18px;
+        scrollbar-width: none
+    }
+
+    .vm-tabs::-webkit-scrollbar {
+        display: none
+    }
+
+    .vm-tab {
+        padding: 9px 12px;
+        font-size: 11px;
+        font-weight: 500;
+        color: var(--g1-muted);
+        cursor: pointer;
+        border-bottom: 2px solid transparent;
+        white-space: nowrap;
+        transition: color .12s
+    }
+
+    .vm-tab:hover {
+        color: var(--g1-text)
+    }
+
+    .vm-tab.active {
+        color: var(--g1-accent);
+        border-bottom-color: var(--g1-accent);
+        font-weight: 600
+    }
+
+    .vm-tab-body {
+        padding: 16px 18px;
+        min-height: 230px
+    }
+
+    /* RING CHARTS */
+    .summary-grid {
+        display: grid;
+        grid-template-columns: repeat(4, 1fr);
+        gap: 12px;
+        margin-bottom: 14px
+    }
+
+    .stat-mini {
+        text-align: center
+    }
+
+    .stat-ring {
+        width: 64px;
+        height: 64px;
+        margin: 0 auto 6px;
+        position: relative
+    }
+
+    .stat-ring svg {
+        width: 64px;
+        height: 64px
+    }
+
+    .stat-ring-val {
+        position: absolute;
+        inset: 0;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 12px;
+        font-weight: 700;
+        color: var(--g1-text)
+    }
+
+    .stat-lbl {
+        font-size: 10px;
+        color: var(--g1-muted);
+        font-weight: 600;
+        text-transform: uppercase;
+        letter-spacing: .5px
+    }
+
+    /* HW TABLE */
+    .hw-table {
+        width: 100%;
+        border-collapse: collapse
+    }
+
+    .hw-table td {
+        padding: 6px 0;
+        font-size: 12px;
+        border-bottom: 1px solid #F1F5F9;
+        vertical-align: top
+    }
+
+    .hw-table td:first-child {
+        color: var(--g1-muted);
+        width: 150px;
+        font-weight: 500
+    }
+
+    /* MONITOR */
+    .monitor-area {
+        background: #F8FAFD;
+        border: 1px solid var(--g1-border);
+        border-radius: 6px;
+        height: 80px;
+        display: flex;
+        align-items: flex-end;
+        padding: 6px 5px;
+        gap: 2px;
+        overflow: hidden
+    }
+
+    .mon-bar {
+        flex: 1;
+        border-radius: 2px 2px 0 0;
+        opacity: .75;
+        min-height: 4px
+    }
+
+    /* SNAP */
+    .snap-item {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 8px 0;
+        border-bottom: 1px solid #F1F5F9;
+        font-size: 12px
+    }
+
+    .snap-name {
+        font-weight: 600;
+        color: var(--g1-text)
+    }
+
+    .snap-date {
+        color: var(--g1-muted);
+        font-size: 11px;
+        margin-top: 1px
+    }
+
+    .btn-xs {
+        font-size: 10px;
+        padding: 3px 8px;
+        border-radius: 4px;
+        border: 1px solid var(--g1-border);
+        background: transparent;
+        color: var(--g1-muted);
+        cursor: pointer
+    }
+
+    /* FW */
+    .fw-rule {
+        display: grid;
+        grid-template-columns: 55px 75px 1fr 1fr 65px 50px;
+        gap: 8px;
+        padding: 7px 0;
+        border-bottom: 1px solid #F1F5F9;
+        font-size: 11px;
+        align-items: center
+    }
+
+    .fw-hdr {
+        font-weight: 600;
+        color: var(--g1-muted);
+        font-size: 10px;
+        text-transform: uppercase;
+        letter-spacing: .5px
+    }
+
+    /* TASK */
+    .task-row {
+        display: flex;
+        align-items: flex-start;
+        gap: 10px;
+        padding: 7px 0;
+        border-bottom: 1px solid #F1F5F9;
+        font-size: 11px
+    }
+
+    .task-dot {
+        width: 8px;
+        height: 8px;
+        border-radius: 50%;
+        margin-top: 2px;
+        flex-shrink: 0
+    }
+
+    .task-ok {
+        background: var(--g1-on)
+    }
+
+    .task-warn {
+        background: var(--g1-warn)
+    }
+
+    .task-err {
+        background: var(--g1-err)
+    }
+
+    .task-desc {
+        color: var(--g1-text);
+        font-weight: 500
+    }
+
+    .task-time {
+        color: var(--g1-muted);
+        font-size: 10px;
+        margin-top: 1px
+    }
+
+    /* PAGES */
+    .mini-bar {
+        height: 5px;
+        background: #E2E8F0;
+        border-radius: 3px;
+        overflow: hidden;
+        width: 60px;
+        display: inline-block;
+        vertical-align: middle
+    }
+
+    .mini-fill {
+        height: 100%;
+        border-radius: 3px;
+        background: var(--g1-accent)
+    }
+
+    .mini-fill-warn {
+        background: var(--g1-warn)
+    }
+
+    .mini-fill-err {
+        background: var(--g1-err)
+    }
+
+    /* SSH PAGE */
+    .ssh-item {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 10px 0;
+        border-bottom: 1px solid #F1F5F9
+    }
+
+    .ssh-name {
+        font-size: 12px;
+        font-weight: 600;
+        color: var(--g1-text)
+    }
+
+    .ssh-fp {
+        font-size: 10px;
+        color: var(--g1-muted);
+        font-family: monospace;
+        margin-top: 2px
+    }
+
+    /* HISTORY TABLE */
+    table {
+        width: 100%;
+        border-collapse: collapse;
+        font-size: 12px
+    }
+
+    thead th {
+        text-align: left;
+        padding: 6px 10px;
+        color: var(--g1-muted);
+        font-weight: 600;
+        border-bottom: 1px solid var(--g1-border);
+        font-size: 10px;
+        text-transform: uppercase;
+        letter-spacing: .5px
+    }
+
+    tbody tr {
+        border-bottom: 1px solid #F1F5F9
+    }
+
+    tbody tr:hover {
+        background: #F8FAFD
+    }
+
+    tbody td {
+        padding: 8px 10px;
+        vertical-align: middle
+    }
+
+    /* MODAL */
+    .modal-bg {
+        display: none;
+        position: absolute;
+        inset: 0;
+        background: rgba(13, 27, 42, .45);
+        z-index: 100;
+        align-items: center;
+        justify-content: center;
+        border-radius: 0
+    }
+
+    .modal-bg.open {
+        display: flex
+    }
+
+    .modal-box {
+        background: #fff;
+        border-radius: 10px;
+        padding: 22px;
+        width: 400px;
+        border: 1px solid var(--g1-border)
+    }
+
+    .modal-title {
+        font-size: 14px;
+        font-weight: 700;
+        color: var(--g1-text);
+        margin-bottom: 4px
+    }
+
+    .modal-sub {
+        font-size: 11px;
+        color: var(--g1-muted);
+        margin-bottom: 16px
+    }
+
+    .modal-label {
+        font-size: 11px;
+        font-weight: 600;
+        color: var(--g1-text);
+        display: block;
+        margin-bottom: 4px
+    }
+
+    .modal-input {
+        width: 100%;
+        border: 1px solid var(--g1-border);
+        border-radius: 5px;
+        padding: 7px 10px;
+        font-size: 12px;
+        color: var(--g1-text);
+        background: #F8FAFC;
+        margin-bottom: 12px
+    }
+
+    .modal-footer {
+        display: flex;
+        justify-content: flex-end;
+        gap: 8px;
+        margin-top: 4px
+    }
+
+    /* STEPPER (create VM) */
+    .stepper {
+        display: flex;
+        gap: 0;
+        margin-bottom: 20px
+    }
+
+    .step {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        font-size: 11px;
+        color: var(--g1-muted)
+    }
+
+    .step.active {
+        color: var(--g1-accent);
+        font-weight: 600
+    }
+
+    .step.done {
+        color: var(--g1-on)
+    }
+
+    .step-num {
+        width: 20px;
+        height: 20px;
+        border-radius: 50%;
+        border: 1.5px solid currentColor;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 10px;
+        font-weight: 700;
+        flex-shrink: 0
+    }
+
+    .step-sep {
+        flex: 1;
+        height: 1px;
+        background: var(--g1-border);
+        margin: 0 6px
+    }
+</style>
+
+<div class="shell">
+
+    <!-- SIDEBAR -->
+    <div class="sidebar">
+        <div class="logo-wrap">
+            <div class="logo-mark">
+                <div class="logo-box"><svg viewBox="0 0 24 24">
+                        <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5" />
+                    </svg></div>
+                <div>
+                    <div class="logo-name">GridOne</div>
+                    <div class="logo-sub">Espace utilisateur</div>
+                </div>
+            </div>
+        </div>
+        <div class="nav-wrap">
+            <div class="nav-group">
+                <div class="nav-group-label">Navigation</div>
+                <div class="nav-item active" id="ni-dashboard" onclick="navTo(this,'pg-dashboard')">
+                    <svg viewBox="0 0 24 24">
+                        <rect x="3" y="3" width="7" height="7" rx="1" />
+                        <rect x="14" y="3" width="7" height="7" rx="1" />
+                        <rect x="3" y="14" width="7" height="7" rx="1" />
+                        <rect x="14" y="14" width="7" height="7" rx="1" />
+                    </svg>
+                    Dashboard
+                </div>
+            </div>
+            <div class="nav-group">
+                <div class="nav-group-label">Mes machines virtuelles</div>
+                <div class="nav-item" id="ni-myvms" onclick="navTo(this,'pg-myvms')">
+                    <svg viewBox="0 0 24 24">
+                        <rect x="2" y="4" width="20" height="16" rx="2" />
+                        <path d="M8 4v16M16 4v16" />
+                    </svg>
+                    Mes VMs
+                    <span
+                        style="margin-left:auto;background:rgba(37,99,235,.25);color:#93C5FD;font-size:9px;font-weight:700;padding:1px 6px;border-radius:10px">3</span>
+                </div>
+                <div class="nav-vm-list">
+                    <div class="vm-tree-item active" onclick="selectVM(this,'vm-ml-01')">
+                        <div class="vm-dot on"></div>vm-ml-ornella-01
+                    </div>
+                    <div class="vm-tree-item" onclick="selectVM(this,'vm-dev-02')">
+                        <div class="vm-dot on"></div>vm-dev-ornella-02
+                    </div>
+                    <div class="vm-tree-item" onclick="selectVM(this,'vm-gpu-03')">
+                        <div class="vm-dot warn"></div>vm-gpu-ornella-03
+                    </div>
+                </div>
+            </div>
+            <div class="nav-group">
+                <div class="nav-group-label">Gestion</div>
+                <div class="nav-item" onclick="navTo(this,'pg-reservations')">
+                    <svg viewBox="0 0 24 24">
+                        <rect x="3" y="4" width="18" height="18" rx="2" />
+                        <path d="M16 2v4M8 2v4M3 10h18" />
+                    </svg>
+                    Réservations
+                </div>
+                <div class="nav-item" onclick="navTo(this,'pg-ssh')">
+                    <svg viewBox="0 0 24 24">
+                        <rect x="2" y="4" width="20" height="16" rx="2" />
+                        <path d="M8 12l2 2 4-4" />
+                    </svg>
+                    Clés SSH
+                </div>
+            </div>
+            <div class="nav-group">
+                <div class="nav-group-label">Compte</div>
+                <div class="nav-item" id="ni-profil" onclick="navTo(this,'pg-profil')">
+                    <svg viewBox="0 0 24 24">
+                        <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
+                        <circle cx="12" cy="7" r="4" />
+                    </svg>
+                    Mon Profil
+                </div>
+            </div>
+        </div>
+        <div class="sidebar-footer">
+            <div class="user-row" onclick="navTo(document.getElementById('ni-profil'),'pg-profil')"
+                title="Voir mon profil">
+                <div class="user-av">OM</div>
+                <div style="min-width:0;flex:1">
+                    <div class="user-name">Ornella Mbo'o</div>
+                    <div class="user-role">ML Avancé</div>
+                </div>
+                <div class="user-row-chevron"><svg viewBox="0 0 24 24">
+                        <path d="M9 18l6-6-6-6" />
+                    </svg></div>
+            </div>
+            <button class="logout-btn" onclick="showLogoutModal()">
+                <svg viewBox="0 0 24 24">
+                    <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
+                    <polyline points="16 17 21 12 16 7" />
+                    <line x1="21" y1="12" x2="9" y2="12" />
+                </svg>
+                Déconnexion
+            </button>
+        </div>
+    </div>
+
+    <!-- MAIN -->
+    <div class="main">
+        <div class="topbar">
+            <div class="search-box">
+                <svg viewBox="0 0 24 24">
+                    <circle cx="11" cy="11" r="8" />
+                    <path d="m21 21-4.35-4.35" />
+                </svg>
+                Rechercher une VM…
+            </div>
+            <div class="topbar-right">
+                <div class="status-pill">
+                    <div class="status-dot"></div>Cluster en ligne
+                </div>
+                <button class="btn-ghost">Aide</button>
+            </div>
+        </div>
+
+        <div class="content">
+
+            <!-- PAGE: DASHBOARD -->
+            <div class="page active" id="pg-dashboard">
+                <div class="welcome">
+                    <div class="welcome-left">
+                        <h2>Bonjour, Ornella</h2>
+                        <p>Vendredi 27 mars 2026 · 3 VMs actives · Cluster Horizon en ligne</p>
+                    </div>
+                    <div class="welcome-right">
+                        <button class="btn-ghost" onclick="navTo(document.getElementById('ni-myvms'),'pg-myvms')">Voir
+                            mes VMs</button>
+                        <button class="btn-accent"
+                            onclick="navTo(document.getElementById('ni-myvms'),'pg-myvms');setTimeout(()=>showCreateVM(),100)">+
+                            Nouvelle réservation</button>
+                    </div>
+                </div>
+
+                <div class="vm-status-row">
+                    <div class="vm-status-card selected" onclick="goToVM(this,'vm-ml-01')">
+                        <div class="vsc-top">
+                            <div>
+                                <div class="vsc-name">vm-ml-ornella-01</div>
+                                <div class="vsc-id">VMID 101</div>
+                            </div>
+                            <span class="badge badge-on">● Running</span>
+                        </div>
+                        <div style="display:flex;justify-content:space-between;font-size:11px;color:var(--g1-muted)">
+                            <span>CPU <b style="color:var(--g1-text)">64%</b></span>
+                            <span>RAM <b style="color:var(--g1-text)">58%</b></span>
+                            <span>Ubuntu 22.04</span>
+                        </div>
+                        <div class="vsc-meta">node-01 · 10.0.1.1 · 8 vCPU · 16 Go</div>
+                    </div>
+                    <div class="vm-status-card" onclick="goToVM(this,'vm-dev-02')">
+                        <div class="vsc-top">
+                            <div>
+                                <div class="vsc-name">vm-dev-ornella-02</div>
+                                <div class="vsc-id">VMID 102</div>
+                            </div>
+                            <span class="badge badge-on">● Running</span>
+                        </div>
+                        <div style="display:flex;justify-content:space-between;font-size:11px;color:var(--g1-muted)">
+                            <span>CPU <b style="color:var(--g1-text)">22%</b></span>
+                            <span>RAM <b style="color:var(--g1-text)">34%</b></span>
+                            <span>Debian 12</span>
+                        </div>
+                        <div class="vsc-meta">node-02 · 10.0.1.2 · 4 vCPU · 8 Go</div>
+                    </div>
+                    <div class="vm-status-card" onclick="goToVM(this,'vm-gpu-03')">
+                        <div class="vsc-top">
+                            <div>
+                                <div class="vsc-name">vm-gpu-ornella-03</div>
+                                <div class="vsc-id">VMID 103</div>
+                            </div>
+                            <span class="badge badge-warn">⚠ High CPU</span>
+                        </div>
+                        <div style="display:flex;justify-content:space-between;font-size:11px;color:var(--g1-muted)">
+                            <span>CPU <b style="color:#92400E">91%</b></span>
+                            <span>RAM <b style="color:var(--g1-text)">80%</b></span>
+                            <span>Ubuntu 22.04</span>
+                        </div>
+                        <div class="vsc-meta">node-03 · 10.0.1.3 · 16 vCPU · 64 Go · 2 GPU</div>
+                    </div>
+                </div>
+
+                <!-- VM DETAIL PANEL on dashboard -->
+                <div class="vm-panel" id="dash-vm-panel">
+                    <div class="vm-panel-hdr">
+                        <div>
+                            <div class="vm-panel-title" id="dash-vd-title">vm-ml-ornella-01</div>
+                            <div class="vm-panel-meta" id="dash-vd-meta">VMID 101 · node-01 · Ubuntu 22.04 · <span
+                                    style="color:var(--g1-on);font-weight:600">Running</span></div>
+                        </div>
+                        <div class="vm-actions">
+                            <button class="btn-vm btn-vm-console" onclick="switchDashTab(null,'console')">
+                                <svg viewBox="0 0 24 24">
+                                    <rect x="2" y="3" width="20" height="14" rx="2" />
+                                    <path d="M8 21h8M12 17v4" />
+                                </svg>Console
+                            </button>
+                            <button class="btn-vm btn-vm-stop" id="dash-startstop">
+                                <svg viewBox="0 0 24 24">
+                                    <rect x="6" y="4" width="4" height="16" />
+                                    <rect x="14" y="4" width="4" height="16" />
+                                </svg>Stop
+                            </button>
+                            <button class="btn-vm">
+                                <svg viewBox="0 0 24 24">
+                                    <path d="M1 4v6h6M23 20v-6h-6" />
+                                    <path d="M20.49 9A9 9 0 0 0 5.64 5.64L1 10M23 14l-4.64 4.36A9 9 0 0 1 3.51 15" />
+                                </svg>Redémarrer
+                            </button>
+                        </div>
+                    </div>
+                    <div class="vm-tabs" id="dash-vm-tabs">
+                        <div class="vm-tab active" onclick="switchDashTab(this,'summary')">Summary</div>
+                        <div class="vm-tab" onclick="switchDashTab(this,'console')">Console</div>
+                        <div class="vm-tab" onclick="switchDashTab(this,'hardware')">Hardware</div>
+                        <div class="vm-tab" onclick="switchDashTab(this,'cloudinit')">Cloud-init</div>
+                        <div class="vm-tab" onclick="switchDashTab(this,'options')">Options</div>
+                        <div class="vm-tab" onclick="switchDashTab(this,'tasks')">Task history</div>
+                        <div class="vm-tab" onclick="switchDashTab(this,'monitor')">Monitor</div>
+                        <div class="vm-tab" onclick="switchDashTab(this,'backup')">Backup</div>
+                        <div class="vm-tab" onclick="switchDashTab(this,'snapshots')">Snapshots</div>
+                        <div class="vm-tab" onclick="switchDashTab(this,'firewall')">Firewall</div>
+                        <div class="vm-tab" onclick="switchDashTab(this,'permissions')">Permissions</div>
+                    </div>
+                    <div class="vm-tab-body" id="dash-tab-body"></div>
+                </div>
+            </div>
+
+            <!-- PAGE: MES VMs -->
+            <div class="page" id="pg-myvms" style="position:relative">
+                <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px">
+                    <div style="display:flex;gap:6px">
+                        <button class="btn-ghost" style="font-size:11px;padding:5px 12px"
+                            onclick="filterVMs(this)">Toutes (3)</button>
+                        <button class="btn-ghost" style="font-size:11px;padding:5px 12px" onclick="filterVMs(this)">En
+                            cours (2)</button>
+                        <button class="btn-ghost" style="font-size:11px;padding:5px 12px"
+                            onclick="filterVMs(this)">Alerte (1)</button>
+                    </div>
+                    <button class="btn-accent" onclick="showCreateVM()">+ Créer une VM</button>
+                </div>
+
+                <!-- VM list -->
+                <div class="vm-panel" style="margin-bottom:14px">
+                    <table>
+                        <thead style="background:#F8FAFD">
+                            <tr>
+                                <th style="padding:10px 16px">VM</th>
+                                <th>Statut</th>
+                                <th>OS</th>
+                                <th>CPU</th>
+                                <th>RAM</th>
+                                <th>IP</th>
+                                <th>Nœud</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr onclick="openVMDetail('vm-ml-01')" style="cursor:pointer">
+                                <td style="padding:10px 16px">
+                                    <div style="font-weight:600;font-size:12px">vm-ml-ornella-01</div>
+                                    <div style="font-size:10px;color:var(--g1-muted)">VMID 101</div>
+                                </td>
+                                <td><span class="badge badge-on">● Running</span></td>
+                                <td><span class="badge badge-blue">Ubuntu 22.04</span></td>
+                                <td>
+                                    <div style="display:flex;align-items:center;gap:5px;font-size:12px">64%<div
+                                            class="mini-bar">
+                                            <div class="mini-fill mini-fill-warn" style="width:64%"></div>
+                                        </div>
+                                    </div>
+                                </td>
+                                <td style="font-size:12px">9.2 / 16 Go</td>
+                                <td style="font-size:11px;font-family:monospace;color:var(--g1-muted)">10.0.1.1</td>
+                                <td><span class="badge badge-off">node-01</span></td>
+                                <td>
+                                    <div style="display:flex;gap:4px">
+                                        <button class="btn-vm btn-vm-console" style="font-size:10px;padding:3px 8px"
+                                            onclick="event.stopPropagation();openVMDetail('vm-ml-01');switchVMTab2('console')">Console</button>
+                                        <button class="btn-vm btn-vm-stop" style="font-size:10px;padding:3px 8px"
+                                            onclick="event.stopPropagation()">Stop</button>
+                                    </div>
+                                </td>
+                            </tr>
+                            <tr onclick="openVMDetail('vm-dev-02')" style="cursor:pointer">
+                                <td style="padding:10px 16px">
+                                    <div style="font-weight:600;font-size:12px">vm-dev-ornella-02</div>
+                                    <div style="font-size:10px;color:var(--g1-muted)">VMID 102</div>
+                                </td>
+                                <td><span class="badge badge-on">● Running</span></td>
+                                <td><span class="badge badge-blue">Debian 12</span></td>
+                                <td>
+                                    <div style="display:flex;align-items:center;gap:5px;font-size:12px">22%<div
+                                            class="mini-bar">
+                                            <div class="mini-fill" style="width:22%"></div>
+                                        </div>
+                                    </div>
+                                </td>
+                                <td style="font-size:12px">2.7 / 8 Go</td>
+                                <td style="font-size:11px;font-family:monospace;color:var(--g1-muted)">10.0.1.2</td>
+                                <td><span class="badge badge-off">node-02</span></td>
+                                <td>
+                                    <div style="display:flex;gap:4px">
+                                        <button class="btn-vm btn-vm-console" style="font-size:10px;padding:3px 8px"
+                                            onclick="event.stopPropagation();openVMDetail('vm-dev-02');switchVMTab2('console')">Console</button>
+                                        <button class="btn-vm btn-vm-stop" style="font-size:10px;padding:3px 8px"
+                                            onclick="event.stopPropagation()">Stop</button>
+                                    </div>
+                                </td>
+                            </tr>
+                            <tr onclick="openVMDetail('vm-gpu-03')" style="cursor:pointer">
+                                <td style="padding:10px 16px">
+                                    <div style="font-weight:600;font-size:12px">vm-gpu-ornella-03</div>
+                                    <div style="font-size:10px;color:var(--g1-muted)">VMID 103</div>
+                                </td>
+                                <td><span class="badge badge-warn">⚠ High CPU</span></td>
+                                <td><span class="badge badge-blue">Ubuntu 22.04</span></td>
+                                <td>
+                                    <div style="display:flex;align-items:center;gap:5px;font-size:12px">91%<div
+                                            class="mini-bar">
+                                            <div class="mini-fill mini-fill-err" style="width:91%"></div>
+                                        </div>
+                                    </div>
+                                </td>
+                                <td style="font-size:12px">51.2 / 64 Go</td>
+                                <td style="font-size:11px;font-family:monospace;color:var(--g1-muted)">10.0.1.3</td>
+                                <td><span class="badge badge-off">node-03</span></td>
+                                <td>
+                                    <div style="display:flex;gap:4px">
+                                        <button class="btn-vm btn-vm-console" style="font-size:10px;padding:3px 8px"
+                                            onclick="event.stopPropagation();openVMDetail('vm-gpu-03');switchVMTab2('console')">Console</button>
+                                        <button class="btn-vm btn-vm-stop" style="font-size:10px;padding:3px 8px"
+                                            onclick="event.stopPropagation()">Stop</button>
+                                    </div>
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+
+                <!-- VM detail panel (Mes VMs page) -->
+                <div class="vm-panel" id="myvms-vm-panel">
+                    <div class="vm-panel-hdr">
+                        <div>
+                            <div class="vm-panel-title" id="myvms-vd-title">vm-ml-ornella-01</div>
+                            <div class="vm-panel-meta" id="myvms-vd-meta">VMID 101 · node-01 · Ubuntu 22.04 · <span
+                                    style="color:var(--g1-on);font-weight:600">Running</span></div>
+                        </div>
+                        <div class="vm-actions">
+                            <button class="btn-vm btn-vm-console" onclick="switchVMTab2('console')">
+                                <svg viewBox="0 0 24 24">
+                                    <rect x="2" y="3" width="20" height="14" rx="2" />
+                                    <path d="M8 21h8M12 17v4" />
+                                </svg>Console
+                            </button>
+                            <button class="btn-vm btn-vm-stop">
+                                <svg viewBox="0 0 24 24">
+                                    <rect x="6" y="4" width="4" height="16" />
+                                    <rect x="14" y="4" width="4" height="16" />
+                                </svg>Stop
+                            </button>
+                            <button class="btn-vm">
+                                <svg viewBox="0 0 24 24">
+                                    <path d="M1 4v6h6M23 20v-6h-6" />
+                                    <path d="M20.49 9A9 9 0 0 0 5.64 5.64L1 10M23 14l-4.64 4.36A9 9 0 0 1 3.51 15" />
+                                </svg>Redémarrer
+                            </button>
+                        </div>
+                    </div>
+                    <div class="vm-tabs" id="myvms-vm-tabs">
+                        <div class="vm-tab active" onclick="switchVMTab2('summary',this)">Summary</div>
+                        <div class="vm-tab" onclick="switchVMTab2('console',this)">Console</div>
+                        <div class="vm-tab" onclick="switchVMTab2('hardware',this)">Hardware</div>
+                        <div class="vm-tab" onclick="switchVMTab2('cloudinit',this)">Cloud-init</div>
+                        <div class="vm-tab" onclick="switchVMTab2('options',this)">Options</div>
+                        <div class="vm-tab" onclick="switchVMTab2('tasks',this)">Task history</div>
+                        <div class="vm-tab" onclick="switchVMTab2('monitor',this)">Monitor</div>
+                        <div class="vm-tab" onclick="switchVMTab2('backup',this)">Backup</div>
+                        <div class="vm-tab" onclick="switchVMTab2('snapshots',this)">Snapshots</div>
+                        <div class="vm-tab" onclick="switchVMTab2('firewall',this)">Firewall</div>
+                        <div class="vm-tab" onclick="switchVMTab2('permissions',this)">Permissions</div>
+                    </div>
+                    <div class="vm-tab-body" id="myvms-tab-body"></div>
+                </div>
+
+                <!-- Modal créer VM -->
+                <div class="modal-bg" id="modal-create-vm" style="position:absolute">
+                    <div class="modal-box" style="width:460px">
+                        <div class="modal-title">Nouvelle réservation VM</div>
+                        <div class="stepper">
+                            <div class="step active">
+                                <div class="step-num">1</div>Image OS
+                            </div>
+                            <div class="step-sep"></div>
+                            <div class="step">
+                                <div class="step-num">2</div>Ressources
+                            </div>
+                            <div class="step-sep"></div>
+                            <div class="step">
+                                <div class="step-num">3</div>Durée
+                            </div>
+                        </div>
+                        <label class="modal-label">Nom de la VM</label>
+                        <input class="modal-input" placeholder="vm-projet-ornella" />
+                        <label class="modal-label">Image OS</label>
+                        <select class="modal-input">
+                            <option>Ubuntu Server 22.04 LTS</option>
+                            <option>Debian 12</option>
+                            <option>Fedora 39</option>
+                            <option>CentOS Stream 9</option>
+                        </select>
+                        <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px">
+                            <div><label class="modal-label">vCPU</label><input class="modal-input" type="number"
+                                    value="4" min="1" max="16" /></div>
+                            <div><label class="modal-label">RAM (Go)</label><input class="modal-input" type="number"
+                                    value="8" min="1" max="64" /></div>
+                            <div><label class="modal-label">GPU</label><input class="modal-input" type="number"
+                                    value="0" min="0" max="2" /></div>
+                        </div>
+                        <label class="modal-label">Durée (heures)</label>
+                        <input class="modal-input" type="number" value="48" min="1" max="168" />
+                        <div class="modal-footer">
+                            <button class="btn-ghost" onclick="closeCreateVM()">Annuler</button>
+                            <button class="btn-accent" onclick="closeCreateVM()">Soumettre la demande</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- PAGE: RÉSERVATIONS -->
+            <div class="page" id="pg-reservations">
+                <div style="display:flex;gap:6px;margin-bottom:16px">
+                    <button class="btn-ghost"
+                        style="font-size:11px;padding:5px 12px;background:var(--g1-accent);color:#fff;border-color:var(--g1-accent)">Toutes</button>
+                    <button class="btn-ghost" style="font-size:11px;padding:5px 12px">En attente</button>
+                    <button class="btn-ghost" style="font-size:11px;padding:5px 12px">Approuvées</button>
+                    <button class="btn-ghost" style="font-size:11px;padding:5px 12px">Rejetées</button>
+                </div>
+                <div class="vm-panel">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th style="padding:10px 16px">VM</th>
+                                <th>Statut</th>
+                                <th>OS</th>
+                                <th>Ressources</th>
+                                <th>Durée</th>
+                                <th>Demandé le</th>
+                                <th>Expiration</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td style="padding:10px 16px">
+                                    <div style="font-weight:600;font-size:12px">vm-ml-ornella-01</div>
+                                </td>
+                                <td><span class="badge badge-on">Approuvée</span></td>
+                                <td><span class="badge badge-blue">Ubuntu 22.04</span></td>
+                                <td style="font-size:11px">8 vCPU · 16 Go · 0 GPU</td>
+                                <td style="font-size:12px">72h</td>
+                                <td style="font-size:11px;color:var(--g1-muted)">21/03/2026</td>
+                                <td style="font-size:11px;color:var(--g1-muted)">27/03 14:00</td>
+                            </tr>
+                            <tr>
+                                <td style="padding:10px 16px">
+                                    <div style="font-weight:600;font-size:12px">vm-dev-ornella-02</div>
+                                </td>
+                                <td><span class="badge badge-on">Approuvée</span></td>
+                                <td><span class="badge badge-blue">Debian 12</span></td>
+                                <td style="font-size:11px">4 vCPU · 8 Go · 0 GPU</td>
+                                <td style="font-size:12px">48h</td>
+                                <td style="font-size:11px;color:var(--g1-muted)">24/03/2026</td>
+                                <td style="font-size:11px;color:var(--g1-muted)">29/03 10:00</td>
+                            </tr>
+                            <tr>
+                                <td style="padding:10px 16px">
+                                    <div style="font-weight:600;font-size:12px">vm-gpu-ornella-03</div>
+                                </td>
+                                <td><span class="badge badge-warn">En attente</span></td>
+                                <td><span class="badge badge-blue">Ubuntu 22.04</span></td>
+                                <td style="font-size:11px">16 vCPU · 64 Go · 2 GPU</td>
+                                <td style="font-size:12px">120h</td>
+                                <td style="font-size:11px;color:var(--g1-muted)">27/03/2026</td>
+                                <td style="font-size:11px;color:var(--g1-muted)">—</td>
+                            </tr>
+                            <tr>
+                                <td style="padding:10px 16px">
+                                    <div style="font-weight:600;font-size:12px">vm-old-ornella-00</div>
+                                </td>
+                                <td><span class="badge badge-err">Rejetée</span></td>
+                                <td><span class="badge badge-blue">Fedora 39</span></td>
+                                <td style="font-size:11px">32 vCPU · 128 Go · 4 GPU</td>
+                                <td style="font-size:12px">240h</td>
+                                <td style="font-size:11px;color:var(--g1-muted)">15/03/2026</td>
+                                <td style="font-size:11px;color:var(--g1-muted)">—</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- PAGE: CLÉS SSH -->
+            <div class="page" id="pg-ssh">
+                <div style="display:flex;justify-content:flex-end;margin-bottom:14px">
+                    <button class="btn-accent" onclick="showSSHModal()">+ Ajouter une clé SSH</button>
+                </div>
+                <div class="vm-panel" style="padding:0">
+                    <div style="padding:14px 18px;border-bottom:1px solid var(--g1-border)">
+                        <div style="font-size:13px;font-weight:600;color:var(--g1-text)">Clés SSH enregistrées</div>
+                        <div style="font-size:11px;color:var(--g1-muted);margin-top:2px">Ces clés sont injectées
+                            automatiquement dans vos VMs via cloud-init.</div>
+                    </div>
+                    <div style="padding:0 18px">
+                        <div class="ssh-item">
+                            <div>
+                                <div class="ssh-name">MacBook Pro Ornella</div>
+                                <div class="ssh-fp">SHA256:xK2mP4rQn8vL1oZ3jT6wY9bA5sC7dE0fG · ed25519</div>
+                                <div style="font-size:10px;color:var(--g1-muted);margin-top:2px">Ajoutée le 21/03/2026
+                                </div>
+                            </div>
+                            <div style="display:flex;gap:6px">
+                                <button class="btn-xs">Copier</button>
+                                <button class="btn-xs" style="color:#991B1B;border-color:#FECACA">Supprimer</button>
+                            </div>
+                        </div>
+                        <div class="ssh-item">
+                            <div>
+                                <div class="ssh-name">Laptop Linux Ornella</div>
+                                <div class="ssh-fp">SHA256:aB3nM7kP2qV5uX9wR1tJ4hL6yN8cZ0eF · ed25519</div>
+                                <div style="font-size:10px;color:var(--g1-muted);margin-top:2px">Ajoutée le 25/03/2026
+                                </div>
+                            </div>
+                            <div style="display:flex;gap:6px">
+                                <button class="btn-xs">Copier</button>
+                                <button class="btn-xs" style="color:#991B1B;border-color:#FECACA">Supprimer</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-bg" id="modal-ssh" style="position:absolute">
+                    <div class="modal-box">
+                        <div class="modal-title">Ajouter une clé SSH</div>
+                        <div class="modal-sub">Collez votre clé publique (~/.ssh/id_ed25519.pub)</div>
+                        <label class="modal-label">Nom de la clé</label>
+                        <input class="modal-input" placeholder="Ex. : MacBook Ornella" />
+                        <label class="modal-label">Clé publique</label>
+                        <textarea class="modal-input" rows="4" style="resize:none;font-family:monospace;font-size:11px"
+                            placeholder="ssh-ed25519 AAAA..."></textarea>
+                        <div class="modal-footer">
+                            <button class="btn-ghost" onclick="closeSSHModal()">Annuler</button>
+                            <button class="btn-accent" onclick="closeSSHModal()">Enregistrer</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- PAGE: MON PROFIL -->
+            <div class="page" id="pg-profil">
+
+                <div class="profile-header">
+                    <div class="profile-av-lg">OM</div>
+                    <div class="profile-hdr-info">
+                        <h2>Ornella Mbo'o</h2>
+                        <p>ornella.mboo@enspy.cm</p>
+                        <div class="profile-hdr-badge">● ML Avancé · Grid-One</div>
+                    </div>
+                    <div style="margin-left:auto;display:flex;gap:8px">
+                        <button class="btn-ghost" style="font-size:12px" onclick="toggleEditProfile()">
+                            <svg viewBox="0 0 24 24"
+                                style="width:13px;height:13px;stroke:currentColor;fill:none;stroke-width:2;display:inline;vertical-align:middle;margin-right:4px">
+                                <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
+                                <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
+                            </svg>
+                            Modifier
+                        </button>
+                    </div>
+                </div>
+
+                <div class="profile-grid">
+
+                    <!-- Informations personnelles -->
+                    <div class="profile-card">
+                        <div class="profile-card-hdr">
+                            <svg viewBox="0 0 24 24">
+                                <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
+                                <circle cx="12" cy="7" r="4" />
+                            </svg>
+                            Informations personnelles
+                        </div>
+                        <div class="profile-field">
+                            <label>Nom complet</label>
+                            <span id="pf-nom">Ornella Mbo'o</span>
+                            <input id="pf-nom-in" style="display:none" value="Ornella Mbo'o" />
+                        </div>
+                        <div class="profile-field">
+                            <label>E-mail institutionnel</label>
+                            <span id="pf-email">ornella.mboo@enspy.cm</span>
+                            <input id="pf-email-in" style="display:none" value="ornella.mboo@enspy.cm" />
+                        </div>
+                        <div class="profile-field">
+                            <label>Organisation</label>
+                            <span>ENSPY — Département Informatique</span>
+                        </div>
+                        <div class="profile-field">
+                            <label>Niveau / Statut</label>
+                            <span>Étudiant — Master 2</span>
+                        </div>
+                    </div>
+
+                    <!-- Accès & Quota -->
+                    <div class="profile-card">
+                        <div class="profile-card-hdr">
+                            <svg viewBox="0 0 24 24">
+                                <rect x="2" y="3" width="20" height="14" rx="2" />
+                                <path d="M8 21h8M12 17v4" />
+                            </svg>
+                            Accès & Quota
+                        </div>
+                        <div class="profile-field">
+                            <label>Groupe d'accès</label>
+                            <span><span class="badge badge-blue">ML Avancé</span></span>
+                        </div>
+                        <div class="profile-field">
+                            <label>VMs autorisées</label>
+                            <span>3 / 5 actives</span>
+                        </div>
+                        <div class="profile-field">
+                            <label>Durée max par réservation</label>
+                            <span>120 heures</span>
+                        </div>
+                        <div class="profile-field">
+                            <label>Compte créé le</label>
+                            <span>21 mars 2026</span>
+                        </div>
+                        <div class="profile-field">
+                            <label>Dernière connexion</label>
+                            <span>Aujourd'hui, 08:14</span>
+                        </div>
+                    </div>
+
+                    <!-- Sécurité -->
+                    <div class="profile-card">
+                        <div class="profile-card-hdr">
+                            <svg viewBox="0 0 24 24">
+                                <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
+                            </svg>
+                            Sécurité
+                        </div>
+                        <div class="profile-field">
+                            <label>Mot de passe</label>
+                            <span>••••••••••</span>
+                        </div>
+                        <div class="profile-field">
+                            <label>Dernière modification MDP</label>
+                            <span>21 mars 2026</span>
+                        </div>
+                        <div class="profile-field">
+                            <label>Clés SSH enregistrées</label>
+                            <span>2 clés actives</span>
+                        </div>
+                        <div style="padding:10px 16px">
+                            <button class="btn-ghost" style="font-size:11px;width:100%">Changer le mot de passe</button>
+                        </div>
+                    </div>
+
+                    <!-- Activité récente -->
+                    <div class="profile-card">
+                        <div class="profile-card-hdr">
+                            <svg viewBox="0 0 24 24">
+                                <circle cx="12" cy="12" r="10" />
+                                <polyline points="12 6 12 12 16 14" />
+                            </svg>
+                            Activité récente
+                        </div>
+                        <div class="profile-field"><label>27/03 12:54</label><span>Console VM/CT 101</span></div>
+                        <div class="profile-field"><label>27/03 08:14</label><span>Connexion au dashboard</span></div>
+                        <div class="profile-field"><label>26/03 23:41</label><span>Snapshot pre-deploy créé</span></div>
+                        <div class="profile-field"><label>26/03 02:00</label><span>Backup quotidien terminé</span></div>
+                    </div>
+
+                </div>
+
+                <!-- Actions danger zone -->
+                <div class="vm-panel" style="border-color:#FECACA">
+                    <div class="vm-panel-hdr" style="background:#FEF2F2">
+                        <div class="vm-panel-title" style="color:#991B1B">Zone sensible</div>
+                    </div>
+                    <div style="padding:16px 18px;display:flex;align-items:center;justify-content:space-between">
+                        <div>
+                            <div style="font-size:13px;font-weight:600;color:var(--g1-text);margin-bottom:3px">Se
+                                déconnecter</div>
+                            <div style="font-size:12px;color:var(--g1-muted)">Terminer la session en cours et retourner
+                                à la page de connexion.</div>
+                        </div>
+                        <button class="btn-danger" onclick="showLogoutModal()">
+                            <svg viewBox="0 0 24 24">
+                                <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
+                                <polyline points="16 17 21 12 16 7" />
+                                <line x1="21" y1="12" x2="9" y2="12" />
+                            </svg>
+                            Déconnexion
+                        </button>
+                    </div>
+                </div>
+
+            </div>
+
+        </div>
+    </div>
+</div>
+
+<!-- LOGOUT CONFIRM MODAL -->
+<div class="logout-modal-bg" id="logout-modal">
+    <div class="logout-modal">
+        <div class="logout-icon">
+            <svg viewBox="0 0 24 24">
+                <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
+                <polyline points="16 17 21 12 16 7" />
+                <line x1="21" y1="12" x2="9" y2="12" />
+            </svg>
+        </div>
+        <h3>Se déconnecter ?</h3>
+        <p>Vous allez être redirigé vers la page de connexion. Vos VMs continueront de fonctionner en arrière-plan.</p>
+        <div class="logout-modal-btns">
+            <button class="btn-ghost" onclick="hideLogoutModal()">Annuler</button>
+            <button class="btn-danger" onclick="confirmLogout()">
+                <svg viewBox="0 0 24 24">
+                    <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
+                    <polyline points="16 17 21 12 16 7" />
+                    <line x1="21" y1="12" x2="9" y2="12" />
+                </svg>
+                Déconnexion
+            </button>
+        </div>
+    </div>
+</div>
+
+<script>
+    const vmData = {
+        'vm-ml-01': { title: 'vm-ml-ornella-01', meta: 'VMID 101 · node-01 · Ubuntu 22.04', status: 'on', cpu: 64, ram: 58, disk: 28, gpu: 0, uptime: '4j 08h 12m', net: '890 MB / 210 MB', io: '18 MB/s', snaps: 2 },
+        'vm-dev-02': { title: 'vm-dev-ornella-02', meta: 'VMID 102 · node-02 · Debian 12', status: 'on', cpu: 22, ram: 34, disk: 15, gpu: 0, uptime: '2j 01h 44m', net: '340 MB / 80 MB', io: '4 MB/s', snaps: 1 },
+        'vm-gpu-03': { title: 'vm-gpu-ornella-03', meta: 'VMID 103 · node-03 · Ubuntu 22.04', status: 'warn', cpu: 91, ram: 80, disk: 42, gpu: 95, uptime: '1j 16h 03m', net: '2.1 GB / 780 MB', io: '68 MB/s', snaps: 3 }
+    };
+
+    let currentVM = 'vm-ml-01';
+    let dashTab = 'summary';
+    let myvmsTab = 'summary';
+
+    function ring(pct, color, label) {
+        const c = 150.8, o = (c * (1 - pct / 100)).toFixed(1);
+        return `<div class="stat-mini"><div class="stat-ring"><svg viewBox="0 0 64 64"><circle cx="32" cy="32" r="26" fill="none" stroke="#E2E8F0" stroke-width="6"/><circle cx="32" cy="32" r="26" fill="none" stroke="${color}" stroke-width="6" stroke-dasharray="${c}" stroke-dashoffset="${o}" stroke-linecap="round" transform="rotate(-90 32 32)"/></svg><div class="stat-ring-val">${pct}%</div></div><div class="stat-lbl">${label}</div></div>`;
+    }
+
+    const tabFn = {
+        summary: d => `<div class="summary-grid">${ring(d.cpu, '#2563EB', 'CPU')}${ring(d.ram, '#F59E0B', 'RAM')}${ring(d.disk, '#22C55E', 'Disque')}${d.gpu > 0 ? ring(d.gpu, '#8B5CF6', 'GPU') : ring(0, '#E2E8F0', 'GPU')}</div><div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;font-size:11px"><div style="padding:8px 10px;background:#F8FAFD;border-radius:6px;border:1px solid var(--g1-border)"><span style="color:var(--g1-muted)">Uptime</span><br><b>${d.status === 'off' ? '—' : d.uptime}</b></div><div style="padding:8px 10px;background:#F8FAFD;border-radius:6px;border:1px solid var(--g1-border)"><span style="color:var(--g1-muted)">Réseau in/out</span><br><b>${d.net}</b></div><div style="padding:8px 10px;background:#F8FAFD;border-radius:6px;border:1px solid var(--g1-border)"><span style="color:var(--g1-muted)">I/O disque</span><br><b>${d.io}</b></div><div style="padding:8px 10px;background:#F8FAFD;border-radius:6px;border:1px solid var(--g1-border)"><span style="color:var(--g1-muted)">Snapshots</span><br><b>${d.snaps} disponible${d.snaps > 1 ? 's' : ''}</b></div></div>`,
+        console: d => `<div style="background:#0D1B2A;border-radius:6px;padding:16px;font-family:monospace;font-size:11px;color:#4ADE80;min-height:160px"><div>${d.title.split('-')[2] || 'user'}@${d.title}:~# <span style="animation:blink 1s step-end infinite">_</span></div><div style="margin-top:8px;color:#94A3B8">Connexion noVNC via WebSocket · Cliquez pour activer le plein écran</div></div><style>@keyframes blink{0%,100%{opacity:1}50%{opacity:0}}</style>`,
+        hardware: d => `<table class="hw-table"><tr><td>Processeurs</td><td><b>${d.cpu > 60 ? '16' : '4'} vCPU (socket 1)</b></td></tr><tr><td>Mémoire</td><td><b>${d.gpu > 0 ? '65536' : '16384'} Mo (balloon activé)</b></td></tr><tr><td>BIOS</td><td><b>SeaBIOS</b></td></tr><tr><td>Machine</td><td><b>q35</b></td></tr><tr><td>Disque (scsi0)</td><td><b>local-lvm · 100 Go · SSD</b></td></tr><tr><td>Réseau (net0)</td><td><b>virtio · vmbr0 · 1 Gbit/s</b></td></tr>${d.gpu > 0 ? '<tr><td>GPU (hostpci0)</td><td><b>NVIDIA A100 · PCIe passthrough</b></td></tr>' : ''}<tr><td>CD/DVD</td><td><b>aucun média</b></td></tr></table>`,
+        cloudinit: d => `<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;font-size:12px"><div><div style="color:var(--g1-muted);font-size:10px;font-weight:600;margin-bottom:4px">UTILISATEUR</div><div style="background:#F8FAFD;border:1px solid var(--g1-border);border-radius:5px;padding:7px 10px">ornella</div></div><div><div style="color:var(--g1-muted);font-size:10px;font-weight:600;margin-bottom:4px">MOT DE PASSE</div><div style="background:#F8FAFD;border:1px solid var(--g1-border);border-radius:5px;padding:7px 10px">••••••••</div></div><div><div style="color:var(--g1-muted);font-size:10px;font-weight:600;margin-bottom:4px">IP CONFIG</div><div style="background:#F8FAFD;border:1px solid var(--g1-border);border-radius:5px;padding:7px 10px;font-family:monospace">dhcp</div></div><div><div style="color:var(--g1-muted);font-size:10px;font-weight:600;margin-bottom:4px">DNS</div><div style="background:#F8FAFD;border:1px solid var(--g1-border);border-radius:5px;padding:7px 10px;font-family:monospace">8.8.8.8</div></div><div style="grid-column:1/-1"><div style="color:var(--g1-muted);font-size:10px;font-weight:600;margin-bottom:4px">CLÉ SSH PUBLIQUE</div><div style="background:#F8FAFD;border:1px solid var(--g1-border);border-radius:5px;padding:7px 10px;font-family:monospace;font-size:10px;word-break:break-all">ssh-ed25519 AAAA...ornella@gridone</div></div></div>`,
+        options: _ => `<table class="hw-table"><tr><td>OS Type</td><td><b>Linux 6.x Kernel</b></td></tr><tr><td>Boot order</td><td><b>scsi0, net0</b></td></tr><tr><td>Start at boot</td><td><b>Oui</b></td></tr><tr><td>QEMU Guest Agent</td><td><b>Activé</b></td></tr><tr><td>KVM hardware virt.</td><td><b>Activé</b></td></tr><tr><td>Tablet device</td><td><b>Activé</b></td></tr></table>`,
+        tasks: _ => `<div><div class="task-row"><div class="task-dot task-ok"></div><div><div class="task-desc">VM démarrée avec succès</div><div class="task-time">Aujourd'hui 08:14</div></div></div><div class="task-row"><div class="task-dot task-ok"></div><div><div class="task-desc">Snapshot "pre-deploy" créé</div><div class="task-time">Hier 23:41</div></div></div><div class="task-row"><div class="task-dot task-warn"></div><div><div class="task-desc">Haute utilisation CPU détectée</div><div class="task-time">Hier 21:08</div></div></div><div class="task-row"><div class="task-dot task-ok"></div><div><div class="task-desc">Backup quotidien terminé</div><div class="task-time">26/03 02:00</div></div></div></div>`,
+        monitor: d => `<div><div style="font-size:10px;color:var(--g1-muted);font-weight:600;margin-bottom:5px;text-transform:uppercase;letter-spacing:.5px">CPU % — 30 dernières minutes</div><div class="monitor-area" id="mc1"></div><div style="font-size:10px;color:var(--g1-muted);font-weight:600;margin:10px 0 5px;text-transform:uppercase;letter-spacing:.5px">RAM % — 30 dernières minutes</div><div class="monitor-area" id="mc2" style="background:#FFFBEB"></div></div>`,
+        backup: _ => `<table class="hw-table"><tr><td>Dernière sauvegarde</td><td><b>26/03/2026 02:00 · OK</b></td></tr><tr><td>Planification</td><td><b>Quotidien à 02:00</b></td></tr><tr><td>Stockage cible</td><td><b>backup-nfs</b></td></tr><tr><td>Rétention</td><td><b>7 sauvegardes</b></td></tr></table>`,
+        snapshots: d => `<div style="display:flex;justify-content:flex-end;margin-bottom:8px"><button class="btn-xs" style="background:var(--g1-accent);color:#fff;border:none;font-size:10px;padding:4px 10px;border-radius:4px">+ Snapshot</button></div><div class="snap-item"><div><div class="snap-name">pre-deploy</div><div class="snap-date">Hier 23:41 · avec RAM</div></div><div style="display:flex;gap:5px"><button class="btn-xs">Restaurer</button><button class="btn-xs" style="color:#991B1B">Supprimer</button></div></div><div class="snap-item"><div><div class="snap-name">baseline-v1</div><div class="snap-date">24/03 10:12</div></div><div style="display:flex;gap:5px"><button class="btn-xs">Restaurer</button><button class="btn-xs" style="color:#991B1B">Supprimer</button></div></div>`,
+        firewall: _ => `<div style="font-size:11px;color:var(--g1-muted);margin-bottom:10px">Politique : entrant DROP · sortant ACCEPT</div><div class="fw-rule fw-hdr"><span>Type</span><span>Action</span><span>Source</span><span>Dest.</span><span>Port</span><span>Proto</span></div><div class="fw-rule"><span><span class="badge badge-blue">IN</span></span><span><span class="badge badge-on">ACCEPT</span></span><span style="font-family:monospace;font-size:10px">0.0.0.0/0</span><span style="font-family:monospace;font-size:10px">VM</span><span>22</span><span>TCP</span></div><div class="fw-rule"><span><span class="badge badge-warn">IN</span></span><span><span class="badge badge-err">DROP</span></span><span style="font-family:monospace;font-size:10px">0.0.0.0/0</span><span style="font-family:monospace;font-size:10px">VM</span><span>*</span><span>*</span></div>`,
+        permissions: _ => `<table class="hw-table"><tr><td>Propriétaire</td><td><b>ornella@gridone.cm</b></td></tr><tr><td>Groupe</td><td><b>ML Avancé</b></td></tr><tr><td>Accès console</td><td><b>ornella@gridone.cm · PVEVMConsole</b></td></tr><tr><td>Accès backup</td><td><b>Lecture seule</b></td></tr></table>`
+    };
+
+    function renderMonitor(d, prefix) {
+        setTimeout(() => {
+            const c1 = document.getElementById(prefix + 'c1');
+            const c2 = document.getElementById(prefix + 'c2');
+            if (c1) { c1.innerHTML = ''; for (let i = 0; i < 30; i++) { const h = Math.max(8, Math.min(90, d.cpu + Math.round((Math.random() - .4) * 25))); const b = document.createElement('div'); b.className = 'mon-bar'; b.style.height = h + '%'; b.style.background = '#2563EB'; c1.appendChild(b); } }
+            if (c2) { c2.innerHTML = ''; for (let i = 0; i < 30; i++) { const h = Math.max(8, Math.min(90, d.ram + Math.round((Math.random() - .4) * 20))); const b = document.createElement('div'); b.className = 'mon-bar'; b.style.height = h + '%'; b.style.background = '#F59E0B'; c2.appendChild(b); } }
+        }, 50);
+    }
+
+    function renderTab(bodyId, tab, d, prefix) {
+        const body = document.getElementById(bodyId);
+        if (!body) return;
+        body.innerHTML = tabFn[tab] ? tabFn[tab](d) : '';
+        if (tab === 'monitor') renderMonitor(d, prefix || 'm');
+    }
+
+    function switchDashTab(el, tab) {
+        if (el) { document.querySelectorAll('#dash-vm-tabs .vm-tab').forEach(t => t.classList.remove('active')); el.classList.add('active'); }
+        else { const tabs = document.querySelectorAll('#dash-vm-tabs .vm-tab'); tabs.forEach(t => { t.classList.remove('active'); if (t.textContent.trim().toLowerCase() === tab || t.getAttribute('onclick').includes("'" + tab + "'")) t.classList.add('active'); }); }
+        dashTab = tab;
+        renderTab('dash-tab-body', tab, vmData[currentVM], 'm');
+    }
+
+    function switchVMTab2(tab, el) {
+        if (el) { document.querySelectorAll('#myvms-vm-tabs .vm-tab').forEach(t => t.classList.remove('active')); el.classList.add('active'); }
+        myvmsTab = tab;
+        renderTab('myvms-tab-body', tab, vmData[currentVM], 'n');
+    }
+
+    function selectVM(el, vmId) {
+        document.querySelectorAll('.vm-tree-item').forEach(i => i.classList.remove('active'));
+        el.classList.add('active');
+        currentVM = vmId;
+        const d = vmData[vmId];
+        ['dash', 'myvms'].forEach(pfx => {
+            const t = document.getElementById(pfx + '-vd-title');
+            const m = document.getElementById(pfx + '-vd-meta');
+            if (t) t.textContent = d.title;
+            if (m) m.textContent = d.meta;
+        });
+        renderTab('dash-tab-body', dashTab, d, 'm');
+        renderTab('myvms-tab-body', myvmsTab, d, 'n');
+    }
+
+    function openVMDetail(vmId) {
+        currentVM = vmId;
+        const d = vmData[vmId];
+        const keys = Object.keys(vmData);
+        const idx = keys.indexOf(vmId);
+        document.querySelectorAll('.vm-tree-item').forEach((i, j) => { i.classList.toggle('active', j === idx); });
+        ['dash', 'myvms'].forEach(pfx => {
+            const t = document.getElementById(pfx + '-vd-title');
+            const m = document.getElementById(pfx + '-vd-meta');
+            if (t) t.textContent = d.title;
+            if (m) m.textContent = d.meta;
+        });
+        renderTab('myvms-tab-body', myvmsTab, d, 'n');
+        document.getElementById('myvms-vm-panel').scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+
+    function goToVM(el, vmId) {
+        document.querySelectorAll('.vm-status-card').forEach(c => c.classList.remove('selected'));
+        el.classList.add('selected');
+        currentVM = vmId;
+        const d = vmData[vmId];
+        document.getElementById('dash-vd-title').textContent = d.title;
+        document.getElementById('dash-vd-meta').textContent = d.meta;
+        renderTab('dash-tab-body', dashTab, d, 'm');
+        document.querySelectorAll('.vm-tree-item').forEach((i, j) => { i.classList.toggle('active', j === Object.keys(vmData).indexOf(vmId)); });
+    }
+
+    function navTo(el, pgId) {
+        document.querySelectorAll('.nav-item').forEach(i => i.classList.remove('active'));
+        el.classList.add('active');
+        document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+        const pg = document.getElementById(pgId);
+        if (pg) pg.classList.add('active');
+    }
+
+    function filterVMs(el) { document.querySelectorAll('.btn-ghost').forEach(b => b.style.background = ''); el.style.background = ''; }
+    function showCreateVM() { document.getElementById('modal-create-vm').classList.add('open') }
+    function closeCreateVM() { document.getElementById('modal-create-vm').classList.remove('open') }
+    function showSSHModal() { document.getElementById('modal-ssh').classList.add('open') }
+    function closeSSHModal() { document.getElementById('modal-ssh').classList.remove('open') }
+
+    renderTab('dash-tab-body', 'summary', vmData['vm-ml-01'], 'm');
+    renderTab('myvms-tab-body', 'summary', vmData['vm-ml-01'], 'n');
+
+    function showLogoutModal() { document.getElementById('logout-modal').classList.add('open'); }
+    function hideLogoutModal() { document.getElementById('logout-modal').classList.remove('open'); }
+    function confirmLogout() {
+        document.getElementById('logout-modal').classList.remove('open');
+        // Redirect to login page (adjust href as needed)
+        setTimeout(() => { window.location.href = 'index.html'; }, 300);
+    }
+
+    // Close modal on backdrop click
+    document.getElementById('logout-modal').addEventListener('click', function (e) {
+        if (e.target === this) hideLogoutModal();
+    });
+
+    let editMode = false;
+    function toggleEditProfile() {
+        editMode = !editMode;
+        ['nom', 'email'].forEach(f => {
+            document.getElementById('pf-' + f).style.display = editMode ? 'none' : '';
+            document.getElementById('pf-' + f + '-in').style.display = editMode ? '' : 'none';
+        });
+        const btn = document.querySelector('[onclick="toggleEditProfile()"]');
+        if (btn) btn.innerHTML = editMode
+            ? '<svg viewBox="0 0 24 24" style="width:13px;height:13px;stroke:currentColor;fill:none;stroke-width:2;display:inline;vertical-align:middle;margin-right:4px"><polyline points="20 6 9 17 4 12"/></svg>Enregistrer'
+            : '<svg viewBox="0 0 24 24" style="width:13px;height:13px;stroke:currentColor;fill:none;stroke-width:2;display:inline;vertical-align:middle;margin-right:4px"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>Modifier';
+    }
+</script>

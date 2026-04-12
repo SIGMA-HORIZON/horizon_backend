@@ -1,0 +1,25 @@
+// import { Header } from "./Header";
+// const names = ['Ada love','Grace Hopper','Margate Hamilton']
+
+// function handleClick(){ //fonction pour l'incrementation 
+//     console.log("increment like count")
+//     setlikes(likes +1)
+// }
+
+// const [likes,setlikes] = React.useState(0); // pour stocker 
+
+// export function HomePage() {
+//     return (
+//       <div>
+//         <Header title="React" />
+//         <ul>
+// {names.map((name)=>(
+
+//     <li key={name}>{name}</li>
+// ))
+// }
+//         </ul>
+// <button onClick={handleClick} >Like({likes})</button>
+//       </div>
+//     );
+//   } 
