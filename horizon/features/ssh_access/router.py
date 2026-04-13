@@ -39,7 +39,7 @@ router = APIRouter(
         "La clé privée SSH doit avoir été téléchargée séparément via `GET /vms/{vm_id}/ssh-key`."
     ),
 )
-def get_ssh_info(
+async def get_ssh_info(
     vm_id: uuid.UUID,
     current_user: CurrentUser,
     db: Session = Depends(get_db),

@@ -4,6 +4,7 @@ schemas.py — Schémas Pydantic pour le package shared_space.
 Définit la structure des données échangées avec les endpoints
 de gestion de l'espace partagé des VMs.
 """
+from __future__ import annotations
 
 from uuid import UUID
 from pydantic import BaseModel
@@ -41,5 +42,15 @@ class SSHCommandRequest(BaseModel):
 
 
 class SSHInfoResponse(BaseModel):
-    output: str | None = None
-    error: str | None = None
+    """
+    Réponse à GET /vms/{vm_id}/ssh-info
+    Retourne les informations nécessaires pour se connecter en SSH.
+    """
+    vm_id:       UUID
+    vm_name:     str
+    ip_address:  str
+    port:        int
+    username:    str
+    ssh_command: str
+
+    model_config = {"from_attributes": True}

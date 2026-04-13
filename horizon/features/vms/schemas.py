@@ -1,4 +1,5 @@
 """Schémas Pydantic — VMs utilisateur."""
+from __future__ import annotations
 
 from datetime import datetime
 from uuid import UUID
