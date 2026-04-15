@@ -70,8 +70,16 @@ def approve_account_request(
     if req.status != AccountRequestStatus.PENDING:
         raise PolicyError("POL-COMPTE-01", f"Cette demande est déjà '{req.status}'.", 409)
 
+    existing_user = db.query(User).filter(User.email == req.email).first()
+    if existing_user:
+        raise PolicyError("POL-COMPTE-01", "Un compte avec cet e-mail existe déjà.", 409)
+
     temp_pwd = generate_temp_password()
     username = _generate_username(db, req.first_name, req.last_name)
+
+    valid_quota_id = None
+    if quota_policy_id and quota_policy_id not in ("null", "undefined", "None", ""):
+        valid_quota_id = uuid.UUID(quota_policy_id)
 
     user = User(
         id=uuid.uuid4(),
@@ -83,7 +91,7 @@ def approve_account_request(
         organisation=req.organisation,
         must_change_pwd=True,
         is_active=True,
-        quota_policy_id=uuid.UUID(quota_policy_id) if quota_policy_id else None,
+        quota_policy_id=valid_quota_id,
     )
     db.add(user)
 

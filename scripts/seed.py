@@ -157,7 +157,7 @@ def seed():
         )
         admin3 = User(
             id=uuid.uuid4(), username="admin.demanou",
-            email="demanou@enspy.cm",
+            email="billnelson113@gmail.com",
             hashed_password=hash_pwd("Admin@Horizon2025!"),
             first_name="Bill Nelson", last_name="DEMANOU",
             organisation="ENSPY / SIGMA",

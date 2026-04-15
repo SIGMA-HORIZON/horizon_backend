@@ -60,8 +60,16 @@ def create_vm(db: Session, owner_id, data: dict) -> VirtualMachine:
     from horizon.infrastructure.proxmox_client import ProxmoxClient, ProxmoxIntegrationError
 
     s = get_settings()
-    iso = db.query(ISOImage).filter(
-        ISOImage.id == uuid.UUID(data["iso_image_id"])).first()
+    iso_id_str = data.get("iso_image_id")
+    if not iso_id_str or str(iso_id_str) in ("null", "undefined", "None", ""):
+        raise PolicyError("POL-RESSOURCES-02", "Une image ISO valide est requise.", 422)
+
+    try:
+        iso_uuid = uuid.UUID(str(iso_id_str))
+    except ValueError:
+        raise PolicyError("POL-RESSOURCES-02", "Format d'identifiant ISO invalide.", 422)
+
+    iso = db.query(ISOImage).filter(ISOImage.id == iso_uuid).first()
     if not iso:
         raise PolicyError("POL-RESSOURCES-02", "Image ISO introuvable.", 404)
     enforce_iso_authorized(iso.is_active)

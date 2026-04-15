@@ -68,9 +68,34 @@ api_v1.include_router(admin_router)
 app.include_router(api_v1)
 
 
+from horizon.shared.policies.enforcer import PolicyError
+
+@app.exception_handler(PolicyError)
+async def policy_exception_handler(request: Request, exc: PolicyError):
+    with open('/tmp/horizon_debug.log', 'a') as f:
+        f.write(f"PolicyError: {exc.detail}\n")
+    return JSONResponse(
+        status_code=exc.status_code,
+        content={"detail": exc.detail},
+    )
+
+from fastapi.exceptions import RequestValidationError
+
+@app.exception_handler(RequestValidationError)
+async def validation_exception_handler(request: Request, exc: RequestValidationError):
+    with open('/tmp/horizon_debug.log', 'a') as f:
+        f.write(f"ValidationError: {exc.errors()}\n")
+    return JSONResponse(
+        status_code=422,
+        content={"detail": exc.errors()}
+    )
+
 @app.exception_handler(Exception)
 async def global_exception_handler(request: Request, exc: Exception):
     logger.error("Erreur non gérée : %s", exc, exc_info=True)
+    import traceback
+    with open('/tmp/horizon_debug.log', 'a') as f:
+        f.write(f"Exception: {traceback.format_exc()}\n")
     return JSONResponse(
         status_code=500,
         content={"detail": "Erreur interne du serveur. Contactez l'équipe SIGMA."},
