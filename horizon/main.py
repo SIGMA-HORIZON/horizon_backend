@@ -54,7 +54,7 @@ app.add_middleware(HTTPSEnforcementMiddleware)
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3000", "https://horizon.enspy.cm"],
+    allow_origins=["http://localhost:3010", "https://horizon.enspy.cm"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],

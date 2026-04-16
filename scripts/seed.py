@@ -135,7 +135,7 @@ def seed():
         print("  -> Admin accounts (3)...")
         admin1 = User(
             id=uuid.uuid4(), username="admin.tamegue",
-            email="tamegue@enspy.cm",
+            email="tameguedonald@gmail.com",
             hashed_password=hash_pwd("Admin@Horizon2025!"),
             first_name="Donald", last_name="TAMEGUE NEGOU",
             organisation="ENSPY / SIGMA",

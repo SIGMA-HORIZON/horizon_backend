@@ -64,14 +64,20 @@ def create_vm(db: Session, owner_id, data: dict) -> VirtualMachine:
     if not iso_id_str or str(iso_id_str) in ("null", "undefined", "None", ""):
         raise PolicyError("POL-RESSOURCES-02", "Une image ISO valide est requise.", 422)
 
+    # Résolution de l'ISO (par ID ou par Nom)
+    iso = None
     try:
         iso_uuid = uuid.UUID(str(iso_id_str))
+        iso = db.query(ISOImage).filter(ISOImage.id == iso_uuid).first()
     except ValueError:
-        raise PolicyError("POL-RESSOURCES-02", "Format d'identifiant ISO invalide.", 422)
+        # Si ce n'est pas un UUID, on cherche par nom (ex: "Debian 12")
+        iso = db.query(ISOImage).filter(
+            (ISOImage.name.ilike(f"%{iso_id_str}%")) | 
+            (ISOImage.os_version.ilike(f"%{iso_id_str}%"))
+        ).first()
 
-    iso = db.query(ISOImage).filter(ISOImage.id == iso_uuid).first()
     if not iso:
-        raise PolicyError("POL-RESSOURCES-02", "Image ISO introuvable.", 404)
+        raise PolicyError("POL-RESSOURCES-02", f"Image ISO introuvable pour : {iso_id_str}", 404)
     enforce_iso_authorized(iso.is_active)
 
     quota = get_effective_quota(db, owner_id)
