@@ -1,19 +1,23 @@
 "use client";
 
-import React, { createContext, useContext, useState } from 'react';
+import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
+import { vmService } from '../../services/vms';
+import { useAuth } from '../../context/AuthContext';
 
 export interface VM {
-  id: string; // The VMID 
-  name: string; // Internal name, e.g. vm-ml-ornella-01
-  os: string; // e.g. Ubuntu 22.04
-  cpu: number; // e.g. 8 (total vCPU)
-  cpuVal: number; // e.g. 64 (percentage)
-  ram: string; // e.g. 16 Go
-  ramVal: number; // e.g. 58 (percentage)
-  storage: string; // e.g. 50 Go
-  ip: string; // e.g. 10.0.1.1
-  status: 'on' | 'warn' | 'off';
-  statusText: string;
+  id: string; // The UUID or ID from DB
+  proxmox_vmid?: number;
+  name: string;
+  os: string;
+  cpu: number;
+  cpu_usage?: number;
+  ram: string; // e.g. "16GB"
+  ram_usage?: number;
+  storage: string;
+  ip_address?: string;
+  status: 'on' | 'off' | 'warn';
+  created_at: string;
+  expires_at: string;
 }
 
 export interface Reservation {
@@ -29,11 +33,13 @@ export interface Reservation {
 
 interface VMContextType {
   vms: VM[];
+  loading: boolean;
   reservations: Reservation[];
-  addVM: (vm: Omit<VM, 'id' | 'cpuVal' | 'ramVal' | 'ip' | 'status' | 'statusText'>) => void;
-  deleteVM: (vmid: string) => void;
-  updateVM: (vmid: string, updates: Partial<VM>) => void;
-  addReservation: (res: Omit<Reservation, 'id' | 'status' | 'date'>) => void;
+  refreshVMs: () => Promise<void>;
+  addVM: (data: any) => Promise<any>;
+  deleteVM: (vmid: string) => Promise<void>;
+  stopVM: (vmid: string) => Promise<void>;
+  extendVM: (vmid: string, hours: number) => Promise<void>;
 }
 
 export const VMContext = createContext<VMContextType | null>(null);
@@ -45,48 +51,62 @@ export const useVMs = () => {
 };
 
 export const VMProvider = ({ children }: { children: React.ReactNode }) => {
-  const [vms, setVMs] = useState<VM[]>([
-    { id: '101', name: 'vm-ml-ornella-01', os: 'Ubuntu 22.04', cpu: 8, cpuVal: 64, ram: '16 Go', ramVal: 58, storage: '50 Go', ip: '10.0.1.1', status: 'on', statusText: 'Running' },
-    { id: '102', name: 'vm-dev-ornella-02', os: 'Debian 12', cpu: 4, cpuVal: 22, ram: '8 Go', ramVal: 34, storage: '20 Go', ip: '10.0.1.2', status: 'on', statusText: 'Running' },
-    { id: '103', name: 'vm-gpu-ornella-03', os: 'Ubuntu 22.04', cpu: 16, cpuVal: 91, ram: '64 Go', ramVal: 80, storage: '100 Go', ip: '10.0.1.3', status: 'warn', statusText: 'High CPU' }
-  ]);
-
+  const { user } = useAuth();
+  const [vms, setVMs] = useState<VM[]>([]);
+  const [loading, setLoading] = useState(false);
   const [reservations, setReservations] = useState<Reservation[]>([]);
 
-  const addVM = (vm: Omit<VM, 'id' | 'cpuVal' | 'ramVal' | 'ip' | 'status' | 'statusText'>) => {
-    const newId = String(100 + vms.length + 1);
-    
-    const newVM: VM = {
-      ...vm,
-      id: newId,
-      cpuVal: 5,
-      ramVal: 12,
-      ip: `10.0.2.${newId}`,
-      status: 'on',
-      statusText: 'Booting'
-    };
-    
-    setVMs([...vms, newVM]);
+  const refreshVMs = useCallback(async () => {
+    if (!user) return;
+    setLoading(true);
+    try {
+      const data = await vmService.listVms();
+      // Map API data to our expected UI format if needed
+      setVMs(data.items || []);
+    } catch (error) {
+      console.error("Failed to fetch VMs:", error);
+    } finally {
+      setLoading(false);
+    }
+  }, [user]);
+
+  useEffect(() => {
+    refreshVMs();
+  }, [refreshVMs]);
+
+  const addVM = async (data: any) => {
+    const newVM = await vmService.createVm(data);
+    await refreshVMs();
+    return newVM;
   };
 
-  const addReservation = (res: Omit<Reservation, 'id' | 'status' | 'date'>) => {
-    const newId = `REQ-${Date.now().toString().slice(-4)}`;
-    const newRes: Reservation = {
-      ...res,
-      id: newId,
-      status: 'pending',
-      date: new Date().toLocaleDateString('fr-FR')
-    };
-    setReservations([...reservations, newRes]);
+  const deleteVM = async (vmid: string) => {
+    await vmService.deleteVm(vmid);
+    await refreshVMs();
   };
 
-  const deleteVM = (vmid: string) => {
-    setVMs(vms.filter(v => v.id !== vmid));
+  const stopVM = async (vmid: string) => {
+    await vmService.stopVm(vmid);
+    await refreshVMs();
   };
 
-  const updateVM = (vmid: string, updates: Partial<VM>) => {
-    setVMs(vms.map(v => v.id === vmid ? { ...v, ...updates } : v));
+  const extendVM = async (vmid: string, hours: number) => {
+    await vmService.extendVm(vmid, hours);
+    await refreshVMs();
   };
 
-  return <VMContext.Provider value={{ vms, reservations, addVM, deleteVM, updateVM, addReservation }}>{children}</VMContext.Provider>;
+  return (
+    <VMContext.Provider value={{
+      vms,
+      loading,
+      reservations,
+      refreshVMs,
+      addVM,
+      deleteVM,
+      stopVM,
+      extendVM
+    }}>
+      {children}
+    </VMContext.Provider>
+  );
 };

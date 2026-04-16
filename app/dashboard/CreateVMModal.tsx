@@ -9,36 +9,48 @@ interface CreateVMModalProps {
 }
 
 export default function CreateVMModal({ isOpen, onClose }: CreateVMModalProps) {
-  const { addReservation } = useVMs();
+  const { addVM } = useVMs();
   const router = useRouter();
-  
+
   const [name, setName] = useState('');
   const [os, setOs] = useState('Ubuntu Server 22.04 LTS');
   const [cpu, setCpu] = useState(4);
   const [ram, setRam] = useState(8);
   const [storage, setStorage] = useState(100);
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState('');
 
   if (!isOpen) return null;
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    addReservation({
-      name: name || 'vm-projet-ornella',
-      os: os.includes('Ubuntu') ? 'Ubuntu 22.04' : (os.includes('Debian') ? 'Debian 12' : 'Fedora 39'),
-      cpu: cpu,
-      ram: `${ram} Go`,
-      storage: `${storage} Go`,
-    });
-    // Reset form
-    setName('');
-    setOs('Ubuntu Server 22.04 LTS');
-    setCpu(4);
-    setRam(8);
-    setStorage(100);
-    onClose();
-    
-    // Auto redirect to reservations tab so they can see their pending request
-    router.push('/dashboard/reservations');
+    setIsLoading(true);
+    setError('');
+
+    try {
+      await addVM({
+        name: name || `vm-${Math.random().toString(36).substring(7)}`,
+        os: os,
+        cpu: cpu,
+        ram: ram,
+        storage: storage,
+      });
+
+      // Reset form
+      setName('');
+      setOs('Ubuntu Server 22.04 LTS');
+      setCpu(4);
+      setRam(8);
+      setStorage(100);
+      onClose();
+
+      router.push('/dashboard/mes-vms');
+    } catch (err: any) {
+      console.error("Failed to create VM:", err);
+      setError(err.response?.data?.detail || "Erreur lors de la création de la VM.");
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   return (
@@ -55,10 +67,15 @@ export default function CreateVMModal({ isOpen, onClose }: CreateVMModalProps) {
         </div>
 
         <form onSubmit={handleSubmit} style={formStyle}>
-          
+          {error && (
+            <div style={{ padding: '12px', background: '#FEF2F2', color: '#EF4444', borderRadius: '8px', marginBottom: '20px', fontSize: '14px' }}>
+              {error}
+            </div>
+          )}
+
           <div className="form-group" style={formGroupStyle}>
             <label style={labelStyle}>Nom de la VM</label>
-            <input type="text" style={inputStyle} placeholder="vm-projet-ornella" value={name} onChange={e => setName(e.target.value)} />
+            <input type="text" style={inputStyle} placeholder="vm-projet-ornella" value={name} onChange={e => setName(e.target.value)} disabled={isLoading} />
           </div>
 
           <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginTop: '32px', marginBottom: '20px' }}>
@@ -67,7 +84,7 @@ export default function CreateVMModal({ isOpen, onClose }: CreateVMModalProps) {
           </div>
 
           <div className="form-group" style={formGroupStyle}>
-            <select style={inputStyle} value={os} onChange={e => setOs(e.target.value)}>
+            <select style={inputStyle} value={os} onChange={e => setOs(e.target.value)} disabled={isLoading}>
               <option>Ubuntu Server 22.04 LTS</option>
               <option>Debian 12</option>
               <option>Fedora 39</option>
@@ -82,21 +99,21 @@ export default function CreateVMModal({ isOpen, onClose }: CreateVMModalProps) {
           <div style={rowStyle}>
             <div className="form-group" style={{ ...formGroupStyle, flex: 1 }}>
               <label style={labelStyle}>vCPU</label>
-              <input type="number" style={inputStyle} value={cpu} onChange={e => setCpu(Number(e.target.value))} />
+              <input type="number" style={inputStyle} value={cpu} onChange={e => setCpu(Number(e.target.value))} disabled={isLoading} />
             </div>
             <div className="form-group" style={{ ...formGroupStyle, flex: 1 }}>
               <label style={labelStyle}>RAM (Go)</label>
-              <input type="number" style={inputStyle} value={ram} onChange={e => setRam(Number(e.target.value))} />
+              <input type="number" style={inputStyle} value={ram} onChange={e => setRam(Number(e.target.value))} disabled={isLoading} />
             </div>
             <div className="form-group" style={{ ...formGroupStyle, flex: 1 }}>
               <label style={labelStyle}>GPU</label>
-              <input type="number" style={inputStyle} defaultValue="0" />
+              <input type="number" style={inputStyle} defaultValue="0" disabled={isLoading} />
             </div>
           </div>
 
           <div className="form-group" style={formGroupStyle}>
             <label style={labelStyle}>Stockage (Go)</label>
-            <input type="number" style={inputStyle} value={storage} onChange={e => setStorage(Number(e.target.value))} />
+            <input type="number" style={inputStyle} value={storage} onChange={e => setStorage(Number(e.target.value))} disabled={isLoading} />
           </div>
 
           <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginTop: '32px', marginBottom: '20px' }}>
@@ -106,17 +123,19 @@ export default function CreateVMModal({ isOpen, onClose }: CreateVMModalProps) {
 
           <div className="form-group" style={formGroupStyle}>
             <label style={labelStyle}>Durée de la réservation (heures)</label>
-            <input type="number" style={inputStyle} defaultValue="48" />
+            <input type="number" style={inputStyle} defaultValue="48" disabled={isLoading} />
           </div>
 
           <div className="form-group" style={formGroupStyle}>
             <label style={labelStyle}>Justification / Projet</label>
-            <textarea style={{ ...inputStyle, minHeight: '80px', resize: 'vertical' }} placeholder="Ex. : Entraînement modèle NLP pour le projet X..."></textarea>
+            <textarea style={{ ...inputStyle, minHeight: '80px', resize: 'vertical' }} placeholder="Ex. : Entraînement modèle NLP pour le projet X..." disabled={isLoading}></textarea>
           </div>
 
           <div style={footerStyle}>
-            <button type="button" onClick={onClose} style={btnGhostStyle}>Annuler</button>
-            <button type="submit" style={btnPrimaryStyle}>Soumettre la demande</button>
+            <button type="button" onClick={onClose} style={btnGhostStyle} disabled={isLoading}>Annuler</button>
+            <button type="submit" style={btnPrimaryStyle} disabled={isLoading}>
+              {isLoading ? 'Traitement...' : 'Soumettre la demande'}
+            </button>
           </div>
         </form>
       </div>

@@ -7,10 +7,36 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import Header from '../components/Header';
 import Footer from '../components/Footer';
+import { useAuth } from '../../context/AuthContext';
 
 export default function Connexion() {
   const router = useRouter();
+  const { login } = useAuth();
   const [showPassword, setShowPassword] = useState(false);
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [error, setError] = useState('');
+  const [isLoading, setIsLoading] = useState(false);
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setError('');
+    setIsLoading(true);
+
+    try {
+      const data = await login(email, password);
+      if (data.must_change_pwd) {
+        router.push('/mon-profil-use/change-password'); // À adapter selon la structure réelle
+      } else {
+        router.push((data.role === 'ADMIN' || data.role === 'SUPER_ADMIN') ? '/admin' : '/dashboard');
+      }
+    } catch (err: any) {
+      console.error("Login error:", err);
+      setError(err.response?.data?.detail || "Identifiants invalides ou erreur de connexion.");
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   return (
     <div className="home-theme">
@@ -21,7 +47,7 @@ export default function Connexion() {
         href="https://fonts.googleapis.com/css2?family=Rajdhani:wght@400;500;600;700&family=DM+Sans:opsz,wght@9..40,300;9..40,400;9..40,500;9..40,600&display=swap"
         rel="stylesheet"
       />
-      
+
       <Header />
 
       <div className="login-container" style={{ padding: '120px 20px 80px' }}>
@@ -36,6 +62,17 @@ export default function Connexion() {
             Utilisez les identifiants provisoires reçus par e-mail. Vous serez invité à changer votre mot de passe à la première connexion.
           </p>
 
+          {error && (
+            <div className="login-alert" style={{ background: 'rgba(239, 68, 68, 0.1)', color: '#ef4444', borderColor: 'rgba(239, 68, 68, 0.2)' }}>
+              <svg className="form-icon" style={{ flexShrink: 0, color: '#ef4444' }} viewBox="0 0 24 24">
+                <circle cx="12" cy="12" r="10"></circle>
+                <line x1="12" y1="8" x2="12" y2="12"></line>
+                <line x1="12" y1="16" x2="12.01" y2="16"></line>
+              </svg>
+              <div>{error}</div>
+            </div>
+          )}
+
           <div className="login-alert">
             <svg className="form-icon" style={{ flexShrink: 0, color: 'var(--cyan)' }} viewBox="0 0 24 24">
               <circle cx="12" cy="12" r="10"></circle>
@@ -47,7 +84,7 @@ export default function Connexion() {
             </div>
           </div>
 
-          <form onSubmit={(e) => { e.preventDefault(); router.push('/dashboard'); }}>
+          <form onSubmit={handleSubmit}>
             <div className="form-group">
               <label className="form-label">ADRESSE E-MAIL</label>
               <div className="input-wrapper">
@@ -59,7 +96,10 @@ export default function Connexion() {
                   type="email"
                   className="form-input"
                   placeholder="jean.dupont@enspy.cm"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
                   required
+                  disabled={isLoading}
                 />
               </div>
             </div>
@@ -75,7 +115,10 @@ export default function Connexion() {
                   type={showPassword ? 'text' : 'password'}
                   className="form-input"
                   placeholder="Mot de passe provisoire"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
                   required
+                  disabled={isLoading}
                 />
                 <div
                   className="input-icon-right"
@@ -108,12 +151,16 @@ export default function Connexion() {
 
             <div className="divider">CONNEXION</div>
 
-            <button type="submit" className="login-btn-primary">
-              <svg className="form-icon" viewBox="0 0 24 24">
-                <line x1="5" y1="12" x2="19" y2="12"></line>
-                <polyline points="12 5 19 12 12 19"></polyline>
-              </svg>
-              <span>Se connecter</span>
+            <button type="submit" className="login-btn-primary" disabled={isLoading}>
+              {isLoading ? (
+                <span className="loader-small"></span>
+              ) : (
+                <svg className="form-icon" viewBox="0 0 24 24">
+                  <line x1="5" y1="12" x2="19" y2="12"></line>
+                  <polyline points="12 5 19 12 12 19"></polyline>
+                </svg>
+              )}
+              <span>{isLoading ? 'Connexion en cours...' : 'Se connecter'}</span>
             </button>
           </form>
 

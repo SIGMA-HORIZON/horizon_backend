@@ -1,16 +1,28 @@
 "use client";
 import { useRouter } from 'next/navigation';
 import { useVMs } from './VMContext';
+import { useAuth } from '../../context/AuthContext';
 
 export default function DashboardHome() {
   const { vms } = useVMs();
+  const { user } = useAuth();
   const router = useRouter();
+
+  // Date dynamique
+  const today = new Date().toLocaleDateString('fr-FR', {
+    weekday: 'long',
+    day: 'numeric',
+    month: 'long',
+    year: 'numeric'
+  });
+
+  const formattedDate = today.charAt(0).toUpperCase() + today.slice(1);
 
   // Compute stats
   const totalVMs = vms.length;
   const activeVMs = vms.filter(v => v.status === 'on' || v.status === 'warn').length;
-  const totalCpu = vms.reduce((acc, v) => acc + v.cpu, 0);
-  const totalRam = vms.reduce((acc, v) => acc + parseFloat(v.ram), 0);
+  const totalCpu = vms.reduce((acc, v) => acc + (v.cpu || 0), 0);
+  const totalRam = vms.reduce((acc, v) => acc + parseFloat(v.ram || '0'), 0);
 
   const statCardStyle = {
     background: '#fff',
@@ -54,8 +66,8 @@ export default function DashboardHome() {
       <div className="page active" id="pg-dashboard">
         <div className="welcome">
           <div className="welcome-left">
-            <h2>Bonjour, Ornella</h2>
-            <p>Vendredi 27 mars 2026 · Cluster Horizon en ligne</p>
+            <h2>Bonjour, {user?.first_name || 'Utilisateur'}</h2>
+            <p>{formattedDate} · Cluster Horizon en ligne</p>
           </div>
           <div className="welcome-right">
             <button className="btn-ghost" onClick={() => router.push('/dashboard/mes-vms')}>Voir mes VMs</button>
@@ -64,7 +76,7 @@ export default function DashboardHome() {
         </div>
 
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '20px', marginTop: '10px' }}>
-          
+
           <div style={statCardStyle}>
             <div style={statIconWrapStyle}>
               <svg viewBox="0 0 24 24" width="20" height="20" stroke="currentColor" strokeWidth="2" fill="none"><rect x="2" y="4" width="20" height="16" rx="2"></rect><path d="M8 4v16M16 4v16"></path></svg>
@@ -94,7 +106,7 @@ export default function DashboardHome() {
               <svg viewBox="0 0 24 24" width="20" height="20" stroke="currentColor" strokeWidth="2" fill="none"><line x1="8" y1="6" x2="21" y2="6"></line><line x1="8" y1="12" x2="21" y2="12"></line><line x1="8" y1="18" x2="21" y2="18"></line><line x1="3" y1="6" x2="3.01" y2="6"></line><line x1="3" y1="12" x2="3.01" y2="12"></line><line x1="3" y1="18" x2="3.01" y2="18"></line></svg>
             </div>
             <div style={statLabelStyle}>RAM Allouée</div>
-            <div style={statValueStyle}>{totalRam} <span style={{fontSize: '18px', color: '#64748B'}}>Go</span></div>
+            <div style={statValueStyle}>{totalRam} <span style={{ fontSize: '18px', color: '#64748B' }}>Go</span></div>
           </div>
 
         </div>
