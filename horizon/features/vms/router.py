@@ -5,6 +5,7 @@ import uuid
 from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
 
+from horizon.core.config import get_settings
 from horizon.features.vms import schemas
 from horizon.features.vms import service as vm_service
 from horizon.infrastructure.database import get_db
@@ -133,7 +134,67 @@ def get_ssh_key(vm_id: uuid.UUID, current_user: CurrentUser, db: Session = Depen
     vm.ssh_public_key = None
     db.commit()
 
-    return schemas.SSHKeyDownloadResponse(
-        ssh_public_key=key_data,
-        warning="Clé disponible une seule fois.",
-    )
+@router.post("/{vm_id}/vnc", summary="Obtenir un accès console VNC à la VM")
+def get_vm_vnc(
+    vm_id: uuid.UUID, 
+    current_user: CurrentUser, 
+    db: Session = Depends(get_db)
+):
+    vm = db.query(VirtualMachine).filter(VirtualMachine.id == vm_id).first()
+    if not vm:
+        raise PolicyError("VM", "VM introuvable.", 404)
+    
+    enforce_vm_ownership(vm.owner_id, current_user.id, current_user.role.value)
+    
+    from horizon.infrastructure.proxmox_client import ProxmoxClient
+    from horizon.features.vms.service import _resolve_proxmox_node_name
+    
+    client = ProxmoxClient()
+    if not client.enabled:
+        raise PolicyError("PROXMOX", "Le service Proxmox est désactivé dans la configuration.", 503)
+        
+    px_node = _resolve_proxmox_node_name(db, vm.node)
+    ticket_data = client.get_vnc_proxy(px_node, vm.proxmox_vmid)
+    
+    # On construit l'URL NoVNC pour le frontend
+    # Format: https://<host>:8006/?console=kvm&novnc=1&node=<node>&vmid=<vmid>&ticket=<ticket>&password=<password>
+    return {
+        "url": f"https://{get_settings().PROXMOX_HOST}:8006/",
+        "ticket": ticket_data["ticket"],
+        "port": ticket_data["port"],
+        "upid": ticket_data["upid"],
+        "node": px_node,
+        "vmid": vm.proxmox_vmid,
+        "user": get_settings().PROXMOX_USER
+    }
+
+
+@router.post("/{vm_id}/terminal", summary="Obtenir un accès terminal xtermjs à la VM")
+def get_vm_terminal(
+    vm_id: uuid.UUID, 
+    current_user: CurrentUser, 
+    db: Session = Depends(get_db)
+):
+    vm = db.query(VirtualMachine).filter(VirtualMachine.id == vm_id).first()
+    if not vm:
+        raise PolicyError("VM", "VM introuvable.", 404)
+    
+    enforce_vm_ownership(vm.owner_id, current_user.id, current_user.role.value)
+    
+    from horizon.infrastructure.proxmox_client import ProxmoxClient
+    from horizon.features.vms.service import _resolve_proxmox_node_name
+    
+    client = ProxmoxClient()
+    if not client.enabled:
+        raise PolicyError("PROXMOX", "Le service Proxmox est désactivé.", 503)
+        
+    px_node = _resolve_proxmox_node_name(db, vm.node)
+    ticket_data = client.get_xterm_proxy(px_node, vm.proxmox_vmid)
+    
+    return {
+        "socket_url": f"wss://{get_settings().PROXMOX_HOST}:8006/api2/json/nodes/{px_node}/qemu/{vm.proxmox_vmid}/vncwebsocket",
+        "ticket": ticket_data["ticket"],
+        "port": ticket_data["port"],
+        "node": px_node,
+        "vmid": vm.proxmox_vmid
+    }

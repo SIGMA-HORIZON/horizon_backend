@@ -123,9 +123,23 @@ class ProxmoxClient:
             logger.exception("list_node_qemu")
             raise ProxmoxIntegrationError(str(e), 502) from e
 
-    def get_vm_current_status(self, node: str, vmid: int) -> dict[str, Any]:
+    def get_vnc_proxy(self, node: str, vmid: int) -> dict[str, Any]:
+        """Obtient un ticket pour une session NoVNC (Interface graphique)."""
+        if not self._api:
+            raise ProxmoxIntegrationError("Proxmox désactivé.", 503)
         try:
-            return self._nodes(node).qemu(vmid).status.current.get()
+            return self._nodes(node).qemu(vmid).vncproxy.post(generate_ticket=1)
         except Exception as e:
-            logger.exception("get_vm_current_status")
+            logger.exception("get_vnc_proxy")
+            raise ProxmoxIntegrationError(str(e), 502) from e
+
+    def get_xterm_proxy(self, node: str, vmid: int) -> dict[str, Any]:
+        """Obtient un ticket pour une session xtermjs (Terminal texte)."""
+        if not self._api:
+            raise ProxmoxIntegrationError("Proxmox désactivé.", 503)
+        try:
+            # L'endpoint spécifique xtermjs renvoie un ticket pour WebSocket
+            return self._nodes(node).qemu(vmid).xtermjs.post()
+        except Exception as e:
+            logger.exception("get_xterm_proxy")
             raise ProxmoxIntegrationError(str(e), 502) from e
