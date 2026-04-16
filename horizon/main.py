@@ -16,6 +16,10 @@ from horizon.features.accounts.router import router as accounts_router
 from horizon.features.admin.router import router as admin_router
 from horizon.features.auth.router import router as auth_router
 from horizon.features.vms.router import router as vms_router
+
+from horizon.features.ssh_access.router   import router as ssh_router
+from horizon.features.shared_space.router import router as shared_space_router
+
 from horizon.infrastructure.scheduler import start_scheduler, stop_scheduler
 from horizon.shared.middleware.security import HTTPSEnforcementMiddleware
 
@@ -65,6 +69,10 @@ api_v1.include_router(auth_router)
 api_v1.include_router(accounts_router)
 api_v1.include_router(vms_router)
 api_v1.include_router(admin_router)
+
+api_v1.include_router(ssh_router)
+api_v1.include_router(shared_space_router)
+
 app.include_router(api_v1)
 
 

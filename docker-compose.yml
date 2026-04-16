@@ -78,10 +78,22 @@ services:
       DATABASE_URL: postgresql+psycopg2://horizon_user:horizon_pass@db:5432/horizon_db
       REDIS_URL: redis://redis:6379/0
       PYTHONPATH: /app
+      # Variables Proxmox lues depuis le fichier .env local
+      PROXMOX_ENABLED: ${PROXMOX_ENABLED:-false}
+      PROXMOX_HOST: ${PROXMOX_HOST:-}
+      PROXMOX_USER: ${PROXMOX_USER:-root@pam}
+      PROXMOX_TOKEN_ID: ${PROXMOX_TOKEN_ID:-horizon}
+      PROXMOX_TOKEN_SECRET: ${PROXMOX_TOKEN_SECRET:-}
+      PROXMOX_VERIFY_SSL: ${PROXMOX_VERIFY_SSL:-false}
+      PROXMOX_DEFAULT_NODE: ${PROXMOX_DEFAULT_NODE:-pve}
+      PROXMOX_NET0_TEMPLATE: ${PROXMOX_NET0_TEMPLATE:-virtio,bridge=vmbr0}
+      APP_SECRET_KEY: ${APP_SECRET_KEY:-changeme}
+      JWT_SECRET_KEY: ${JWT_SECRET_KEY:-changeme}
     ports:
       - "8000:8000"
     volumes:
       - ./horizon:/app/horizon
+      - ./scripts:/app/scripts
     depends_on:
       db:
         condition: service_healthy
