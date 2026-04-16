@@ -13,7 +13,6 @@ from horizon.shared.models import (
     IsoProxmoxTemplate,
     LoginAttempt,
     OSFamily,
-    PhysicalNode,
     QuotaOverride,
     QuotaPolicy,
     QuotaViolation,
@@ -25,6 +24,7 @@ from horizon.shared.models import (
     User,
     UserRoleEnum,
     VirtualMachine,
+    PhysicalNode,
     ViolationType,
     VMStatus,
     IncidentSeverity,
@@ -280,7 +280,7 @@ def seed():
 
         # ---------------------------------------------------------- VIRTUAL MACHINES (15)
         print("  -> Virtual machines (15)...")
-        nodes_cycle = [PhysicalNode.REM, PhysicalNode.RAM, PhysicalNode.EMILIA]
+        nodes_cycle = [PhysicalNode.MAITRE, PhysicalNode.ESCLAVE, PhysicalNode.REM, PhysicalNode.RAM, PhysicalNode.EMILIA]
         vm_configs = [
             # (owner_idx, name, vcpu, ram, storage, iso_idx, status, lease_delta_hours, proxmox_vmid)
             (0, "alice-ml-training",      4, 8.0,
@@ -317,7 +317,7 @@ def seed():
 
         vms = []
         for i, (owner_idx, name, vcpu, ram, storage, iso_idx, status, lease_h, pvmid) in enumerate(vm_configs):
-            node = nodes_cycle[i % 3]
+            node = nodes_cycle[i % 5]
             lease_start = now - timedelta(hours=2)
             lease_end = now + \
                 timedelta(hours=lease_h) if lease_h > 0 else now - \

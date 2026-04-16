@@ -79,19 +79,19 @@ def decode_access_token(token: str) -> dict:
         raise PolicyError("POL-SEC-02", f"Token invalide ou expiré : {e}", 401)
 
 
-def authenticate_user(db: Session, username: str, password: str, ip_address: str) -> User:
+def authenticate_user(db: Session, email: str, password: str, ip_address: str = "unknown") -> User:
     GENERIC_ERROR = PolicyError(
         "POL-COMPTE-02",
         "Identifiants incorrects.",
         401,
     )
 
-    user: Optional[User] = db.query(User).filter(User.username == username).first()
+    user = db.query(User).filter(User.email == email).first()
 
     attempt = LoginAttempt(
         id=uuid.uuid4(),
         user_id=user.id if user else None,
-        username_tried=username,
+        username_tried=email,
         success=False,
         ip_address=ip_address,
         timestamp=datetime.now(timezone.utc),
@@ -125,7 +125,7 @@ def authenticate_user(db: Session, username: str, password: str, ip_address: str
 
         if user.failed_login_count == settings.ADMIN_ALERT_ATTEMPTS:
             admin_emails = _get_admin_emails(db)
-            send_login_alert_to_admin(admin_emails, username, ip_address)
+            send_login_alert_to_admin(admin_emails, email, ip_address)
 
         db.commit()
         raise GENERIC_ERROR

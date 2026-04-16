@@ -21,7 +21,7 @@ def upgrade() -> None:
     op.execute("CREATE TYPE os_family_enum AS ENUM ('LINUX','WINDOWS')")
     op.execute(
         "CREATE TYPE account_request_status_enum AS ENUM ('PENDING','APPROVED','REJECTED')")
-    op.execute("CREATE TYPE physical_node_enum AS ENUM ('REM','RAM','EMILIA')")
+    op.execute("CREATE TYPE physical_node_enum AS ENUM ('MAITRE','ESCLAVE','REM','RAM','EMILIA')")
     op.execute(
         "CREATE TYPE vm_status_enum AS ENUM ('ACTIVE','STOPPED','EXPIRED','SUSPENDED','PENDING')")
     op.execute("""CREATE TYPE audit_action_enum AS ENUM (
@@ -246,7 +246,7 @@ def upgrade() -> None:
                     sa.Column("owner_id",       postgresql.UUID(as_uuid=True),
                               sa.ForeignKey("users.id", ondelete="CASCADE"), nullable=False),
                     sa.Column("node",           postgresql.ENUM(
-                        "REM", "RAM", "EMILIA",
+                        "MAITRE","ESCLAVE", "REM", "RAM", "EMILIA",
                         name="physical_node_enum", create_type=False), nullable=False),
                     sa.Column("vcpu",           sa.Integer(), nullable=False),
                     sa.Column("ram_gb",         sa.Float(),   nullable=False),

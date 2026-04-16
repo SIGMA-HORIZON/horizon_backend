@@ -1,6 +1,5 @@
 """
-Horizon API — point d'entrée FastAPI
-POL-SIGMA-HORIZON-v1.0
+Horizon API — Point d'entrée FastAPI (v2).
 """
 
 import logging
@@ -30,10 +29,10 @@ logger = logging.getLogger("horizon.main")
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    logger.info("Horizon API — Démarrage...")
+    logger.info("Horizon API v2 — Démarrage (Proxmox=%s)", settings.PROXMOX_ENABLED)
     start_scheduler()
     yield
-    logger.info("Horizon API — Arrêt...")
+    logger.info("Horizon API v2 — Arrêt.")
     stop_scheduler()
 
 
@@ -41,20 +40,21 @@ app = FastAPI(
     title="Horizon API",
     description=(
         "API de gestion de machines virtuelles — Projet SIGMA / ENSPY\n\n"
-        "Politique de référence : **POL-SIGMA-HORIZON-v1.0**\n\n"
-        "Préfixe des routes métier : **`/api/v1`**"
+        "**v2** : Parcours A (templates + Cloud-Init), Parcours B (ISO + disque), "
+        "téléchargement ISO avec cache et WebSocket de suivi, "
+        "load balancing automatique des nœuds Proxmox.\n\n"
+        f"Préfixe des routes : **`{API_V1_PREFIX}`**"
     ),
-    version="1.0.0",
+    version="2.0.0",
     docs_url="/docs",
     redoc_url="/redoc",
     lifespan=lifespan,
 )
 
 app.add_middleware(HTTPSEnforcementMiddleware)
-
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3000", "https://horizon.enspy.cm"],
+    allow_origins=["http://localhost:3010", "http://localhost:3000", "http://127.0.0.1:3010", "https://horizon.enspy.cm"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -82,14 +82,13 @@ def health_check():
     return {
         "status": "ok",
         "app": "Horizon API",
-        "version": "1.0.0",
+        "version": "2.0.0",
         "env": settings.APP_ENV,
-        "email_mode": settings.EMAIL_MODE,
+        "proxmox_enabled": settings.PROXMOX_ENABLED,
+        "proxmox_host": settings.PROXMOX_HOST or "non configuré",
     }
 
 
 @app.get("/", tags=["Système"], include_in_schema=False)
 def root():
-    return {
-        "message": "Horizon API — SIGMA / ENSPY. Documentation : /docs — API métier : /api/v1"
-    }
+    return {"message": "Horizon API v2 — SIGMA / ENSPY. Docs : /docs"}

@@ -1,6 +1,10 @@
 """
-Horizon — Configuration (Pydantic v2 BaseSettings)
-Politiques POL-SIGMA-HORIZON-v1.0
+Horizon — Configuration (Pydantic v2 BaseSettings) — v2.
+
+Nouveaux paramètres Proxmox :
+  PROXMOX_NODE_STRATEGY   : stratégie de sélection nœud ("least_vms" | "most_ram")
+  PROXMOX_ISO_STORAGE     : stockage par défaut pour les ISOs (ex: "local")
+  PROXMOX_DISK_STORAGE    : stockage par défaut pour les disques VM (ex: "local-lvm")
 """
 
 from functools import lru_cache
@@ -69,15 +73,26 @@ class Settings(BaseSettings):
     HARD_LIMIT_SESSION_HOURS: int = 72
     HARD_LIMIT_SHARED_SPACE_GB: float = 20.0
 
-    # Proxmox — désactivé par défaut (aucun appel API, comportement métier inchangé)
+    # ── Proxmox ────────────────────────────────────────────────────────────
     PROXMOX_ENABLED: bool = False
     PROXMOX_HOST: str = ""
-    PROXMOX_USER: str = ""
-    PROXMOX_TOKEN_ID: str = ""
-    PROXMOX_TOKEN_SECRET: str = ""
+    PROXMOX_USER: str = ""          # ex: horizon@pve ou horizon@pam
+    PROXMOX_TOKEN_ID: str = ""      # nom du token API (ex: "horizon-token")
+    PROXMOX_TOKEN_SECRET: str = ""  # valeur UUID du token
     PROXMOX_VERIFY_SSL: bool = False
-    PROXMOX_DEFAULT_NODE: str = ""
+
+    # Sélection de nœud automatique
+    PROXMOX_NODE_STRATEGY: str = "least_vms"   # "least_vms" | "most_ram"
+
+    # Stockages par défaut
+    PROXMOX_ISO_STORAGE: str = "local"          # stockage des ISOs
+    PROXMOX_DISK_STORAGE: str = "local-lvm"     # stockage disques VM
+
+    # Réseau
     PROXMOX_NET0_TEMPLATE: str = "virtio,bridge=vmbr0"
+
+    # Fallback VMID (si next_free_vmid Proxmox indisponible)
+    PROXMOX_VMID_BASE: int = 200
 
 
 @lru_cache

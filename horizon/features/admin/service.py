@@ -1,234 +1,349 @@
-"""Logique métier réservée aux administrateurs."""
+"""
+Admin Service (v2).
+
+Fonctionnalités :
+- Validation / rejet d'ISOs (PATCH /admin/isos/{id}/validate|reject)
+- Monitoring ressources cluster Proxmox
+- Gestion nœuds (liste live depuis Proxmox)
+- Dashboard VMs admin
+- Opérations Proxmox directes (pause, status, list qemu)
+"""
+
+from __future__ import annotations
 
 import uuid
+from typing import Any
 
 from sqlalchemy.orm import Session
 
 from horizon.core.config import get_settings
-from horizon.features.admin import schemas
-from horizon.features.vms import service as vm_service
-from horizon.features.vms.service import _resolve_proxmox_node_name
+from horizon.shared.audit_service import log_action
 from horizon.shared.models import (
+    AuditAction,
+    ISOImage,
     IsoProxmoxTemplate,
-    ProxmoxNodeMapping,
-    QuotaOverride,
-    User,
     VirtualMachine,
+    VMStatus,
 )
-from horizon.shared.models.virtual_machine import PhysicalNode
+from horizon.shared.models.iso_image import ISOStatus
 from horizon.shared.policies.enforcer import PolicyError
 
 
-def build_admin_vm_dashboard(db: Session) -> schemas.AdminVMListResponse:
-    vms = vm_service.get_all_vms_admin(db)
-    items: list[schemas.AdminVMRowResponse] = []
-    for vm in vms:
-        owner = db.query(User).filter(User.id == vm.owner_id).first()
-        items.append(
-            schemas.AdminVMRowResponse(
-                id=vm.id,
-                proxmox_vmid=vm.proxmox_vmid,
-                name=vm.name,
-                owner_username=owner.username if owner else None,
-                node=vm.node.value,
-                vcpu=vm.vcpu,
-                ram_gb=vm.ram_gb,
-                storage_gb=vm.storage_gb,
-                status=vm.status.value,
-                lease_end=vm.lease_end,
-                ip_address=vm.ip_address,
-            )
+# ─────────────────────── Helpers ──────────────────────────────────────────
+
+def _get_iso_or_404(db: Session, iso_id) -> ISOImage:
+    iso = db.query(ISOImage).filter(ISOImage.id == iso_id).first()
+    if not iso:
+        raise PolicyError("ISO", "ISO introuvable.", 404)
+    return iso
+
+
+def _get_proxmox():
+    from horizon.infrastructure.proxmox_service import ProxmoxError, ProxmoxService
+    s = get_settings()
+    if not s.PROXMOX_ENABLED:
+        raise PolicyError("PROXMOX", "Proxmox désactivé dans la configuration.", 503)
+    try:
+        return ProxmoxService()
+    except ProxmoxError as exc:
+        raise PolicyError("PROXMOX", exc.message, exc.status_code) from exc
+
+
+def _proxmox_error(exc) -> PolicyError:
+    return PolicyError("PROXMOX", exc.message, exc.status_code)
+
+
+# ─────────────────────── ISO Admin ────────────────────────────────────────
+
+def list_all_isos(db: Session) -> list[ISOImage]:
+    return db.query(ISOImage).order_by(ISOImage.created_at.desc()).all()
+
+
+def validate_iso(db: Session, iso_id, admin_id, note: str | None = None) -> ISOImage:
+    """
+    PATCH /admin/isos/{id}/validate
+
+    Transite l'ISO vers VALIDATED et l'active pour tous les utilisateurs.
+    Seul un ISO en statut PENDING_ANALYST peut être validé.
+    """
+    iso = _get_iso_or_404(db, iso_id)
+
+    if iso.status == ISOStatus.VALIDATED:
+        raise PolicyError("ISO", "Cette ISO est déjà validée.", 409)
+
+    if iso.status not in (ISOStatus.PENDING_ANALYST,):
+        raise PolicyError(
+            "ISO",
+            f"Impossible de valider une ISO en statut '{iso.status.value}'. "
+            "Seul le statut PENDING_ANALYST est éligible.",
+            422,
         )
-    return schemas.AdminVMListResponse(items=items)
 
+    iso.status = ISOStatus.VALIDATED
+    iso.is_active = True
+    if note:
+        iso.description = f"{iso.description or ''} [Validation: {note}]".strip()
 
-def apply_quota_override(db: Session, body: schemas.QuotaOverrideRequest, admin_id) -> None:
-    data = body.model_dump(exclude={"user_id", "reason"}, exclude_none=True)
-
-    existing = (
-        db.query(QuotaOverride)
-        .filter(QuotaOverride.user_id == uuid.UUID(body.user_id))
-        .first()
+    log_action(
+        db, admin_id, AuditAction.VM_MODIFIED, "iso", iso.id,
+        metadata={"action": "validate", "note": note},
     )
+    db.commit()
+    db.refresh(iso)
+    return iso
 
-    if existing:
-        for k, v in data.items():
-            setattr(existing, k, v)
-        existing.granted_by_id = admin_id
-        existing.reason = body.reason
-    else:
-        override = QuotaOverride(
-            id=uuid.uuid4(),
-            user_id=uuid.UUID(body.user_id),
-            granted_by_id=admin_id,
-            reason=body.reason,
-            **data,
+
+def reject_iso(db: Session, iso_id, admin_id, reason: str) -> ISOImage:
+    """
+    PATCH /admin/isos/{id}/reject
+
+    Marque l'ISO comme ERROR avec un message de rejet.
+    """
+    iso = _get_iso_or_404(db, iso_id)
+
+    if iso.status == ISOStatus.VALIDATED:
+        raise PolicyError("ISO", "Impossible de rejeter une ISO déjà validée.", 409)
+
+    iso.status = ISOStatus.ERROR
+    iso.is_active = False
+    iso.error_message = f"Rejet administrateur : {reason}"
+
+    log_action(
+        db, admin_id, AuditAction.VM_MODIFIED, "iso", iso.id,
+        metadata={"action": "reject", "reason": reason},
+    )
+    db.commit()
+    db.refresh(iso)
+    return iso
+
+
+def delete_iso(db: Session, iso_id, admin_id) -> None:
+    """DELETE /admin/isos/{id} — Suppression définitive (uniquement si non utilisée)."""
+    iso = _get_iso_or_404(db, iso_id)
+
+    # Vérifier qu'aucune VM n'utilise cette ISO
+    vm_count = (
+        db.query(VirtualMachine)
+        .filter(
+            VirtualMachine.iso_image_id == iso_id,
+            VirtualMachine.status.in_([VMStatus.ACTIVE, VMStatus.PENDING]),
         )
-        db.add(override)
+        .count()
+    )
+    if vm_count > 0:
+        raise PolicyError(
+            "ISO",
+            f"Impossible de supprimer : {vm_count} VM(s) active(s) utilisent cette ISO.",
+            409,
+        )
+
+    log_action(db, admin_id, AuditAction.VM_ADMIN_DELETED, "iso", iso_id)
+    db.delete(iso)
+    db.commit()
 
 
-def get_vm_or_404(db: Session, vm_id: uuid.UUID) -> VirtualMachine:
+# ─────────────────────── Cluster Monitoring ───────────────────────────────
+
+def get_cluster_summary(db: Session) -> dict[str, Any]:
+    """
+    GET /admin/cluster/summary
+
+    Ressources globales du cluster Proxmox + stats BD.
+    """
+    from horizon.infrastructure.proxmox_service import ProxmoxError
+
+    result: dict[str, Any] = {
+        "proxmox_available": False,
+        "nodes": [],
+        "total_nodes": 0,
+        "total_vms_proxmox": 0,
+        "db_stats": _db_vm_stats(db),
+    }
+
+    s = get_settings()
+    if not s.PROXMOX_ENABLED:
+        return result
+
+    try:
+        svc = _get_proxmox()
+        summary = svc.cluster_resources_summary()
+        result.update({
+            "proxmox_available": True,
+            **summary,
+        })
+    except (PolicyError, Exception):
+        result["proxmox_available"] = False
+
+    return result
+
+
+def get_cluster_nodes(db: Session) -> list[dict[str, Any]]:
+    """GET /admin/cluster/nodes — liste live des nœuds."""
+    from horizon.infrastructure.proxmox_service import ProxmoxError
+
+    s = get_settings()
+    if not s.PROXMOX_ENABLED:
+        return []
+
+    try:
+        svc = _get_proxmox()
+        nodes = svc.list_nodes()
+        return [
+            {
+                "name": n.name,
+                "cpu_usage_pct": round(n.cpu_usage * 100, 1),
+                "mem_used_gb": round(n.mem_used / (1024 ** 3), 2),
+                "mem_total_gb": round(n.mem_total / (1024 ** 3), 2),
+                "mem_free_gb": n.mem_free_gb,
+                "vm_count": n.vm_count,
+            }
+            for n in nodes
+        ]
+    except (PolicyError, Exception):
+        return []
+
+
+def _db_vm_stats(db: Session) -> dict[str, int]:
+    from sqlalchemy import func
+    rows = (
+        db.query(VirtualMachine.status, func.count(VirtualMachine.id))
+        .group_by(VirtualMachine.status)
+        .all()
+    )
+    stats = {status.value: count for status, count in rows}
+    stats["total"] = sum(stats.values())
+    return stats
+
+
+# ─────────────────────── VM Dashboard Admin ───────────────────────────────
+
+def build_admin_vm_dashboard(db: Session) -> dict[str, Any]:
+    vms = db.query(VirtualMachine).all()
+    return {
+        "items": vms,
+        "total": len(vms),
+    }
+
+
+def get_vm_or_404(db: Session, vm_id) -> VirtualMachine:
     vm = db.query(VirtualMachine).filter(VirtualMachine.id == vm_id).first()
     if not vm:
         raise PolicyError("VM", "VM introuvable.", 404)
     return vm
 
 
-def _require_proxmox_enabled() -> None:
-    if not get_settings().PROXMOX_ENABLED:
-        raise PolicyError(
-            "PROXMOX", "Proxmox est désactivé (PROXMOX_ENABLED=false).", 503)
+# ─────────────────────── Proxmox Opérations Directes ──────────────────────
 
+def admin_proxmox_pause_by_vmid(db: Session, proxmox_vmid: int) -> dict[str, Any]:
+    from horizon.infrastructure.proxmox_service import ProxmoxError
 
-def assert_known_proxmox_node_name(db: Session, node_name: str) -> None:
-    known = {r.proxmox_node_name for r in db.query(ProxmoxNodeMapping).all()}
-    if node_name not in known:
-        raise PolicyError(
-            "PROXMOX",
-            f"Nœud Proxmox inconnu ou non mappé : {node_name}",
-            400,
-        )
-
-
-def admin_proxmox_pause_by_vmid(db: Session, proxmox_vmid: int) -> schemas.ProxmoxOperationResponse:
-    from horizon.infrastructure.proxmox_client import ProxmoxClient, ProxmoxIntegrationError
-
-    _require_proxmox_enabled()
-    vm = db.query(VirtualMachine).filter(
-        VirtualMachine.proxmox_vmid == proxmox_vmid).first()
+    vm = db.query(VirtualMachine).filter(VirtualMachine.proxmox_vmid == proxmox_vmid).first()
     if not vm:
-        raise PolicyError("VM", "Aucune VM Horizon avec ce proxmox_vmid.", 404)
-    px_node = _resolve_proxmox_node_name(db, vm.node)
+        raise PolicyError("VM", f"VM avec proxmox_vmid={proxmox_vmid} introuvable.", 404)
+
     try:
-        client = ProxmoxClient()
-        out = client.pause_vm(px_node, proxmox_vmid)
-    except ProxmoxIntegrationError as e:
-        raise PolicyError("PROXMOX", e.message, e.status_code) from e
-    return schemas.ProxmoxOperationResponse(status=out["status"], message=out["message"])
+        svc = _get_proxmox()
+        upid = svc.suspend_vm(vm.proxmox_node, proxmox_vmid)
+    except PolicyError:
+        raise
+    except Exception as exc:
+        raise PolicyError("PROXMOX", str(exc), 502) from exc
+
+    vm.status = VMStatus.SUSPENDED
+    db.commit()
+
+    return {"message": f"VM {proxmox_vmid} suspendue.", "upid": upid}
 
 
-def admin_proxmox_list_qemu(db: Session, node_name: str) -> schemas.ProxmoxQemuListResponse:
-    from horizon.infrastructure.proxmox_client import ProxmoxClient, ProxmoxIntegrationError
+def admin_proxmox_list_qemu(db: Session, node_name: str) -> dict[str, Any]:
+    from horizon.infrastructure.proxmox_service import ProxmoxError
 
-    _require_proxmox_enabled()
-    assert_known_proxmox_node_name(db, node_name)
     try:
-        client = ProxmoxClient()
-        vms = client.list_node_qemu(node_name)
-    except ProxmoxIntegrationError as e:
-        raise PolicyError("PROXMOX", e.message, e.status_code) from e
-    return schemas.ProxmoxQemuListResponse(count=len(vms), items=vms)
+        svc = _get_proxmox()
+        vms = svc.list_node_vms(node_name)
+    except PolicyError:
+        raise
+    except ProxmoxError as exc:
+        raise _proxmox_error(exc) from exc
+
+    return {"node": node_name, "vms": vms}
 
 
-def admin_proxmox_vm_status(db: Session, proxmox_vmid: int) -> schemas.ProxmoxVmStatusResponse:
-    from horizon.infrastructure.proxmox_client import ProxmoxClient, ProxmoxIntegrationError
+def admin_proxmox_vm_status(db: Session, proxmox_vmid: int) -> dict[str, Any]:
+    from horizon.infrastructure.proxmox_service import ProxmoxError
 
-    _require_proxmox_enabled()
-    vm = db.query(VirtualMachine).filter(
-        VirtualMachine.proxmox_vmid == proxmox_vmid).first()
+    vm = db.query(VirtualMachine).filter(VirtualMachine.proxmox_vmid == proxmox_vmid).first()
     if not vm:
-        raise PolicyError("VM", "Aucune VM Horizon avec ce proxmox_vmid.", 404)
-    px_node = _resolve_proxmox_node_name(db, vm.node)
+        raise PolicyError("VM", f"VM proxmox_vmid={proxmox_vmid} introuvable.", 404)
+
     try:
-        client = ProxmoxClient()
-        data = client.get_vm_current_status(px_node, proxmox_vmid)
-    except ProxmoxIntegrationError as e:
-        raise PolicyError("PROXMOX", e.message, e.status_code) from e
-    return schemas.ProxmoxVmStatusResponse(data=data)
+        svc = _get_proxmox()
+        raw = svc.get_vm_status(vm.proxmox_node, proxmox_vmid)
+    except PolicyError:
+        raise
+    except ProxmoxError as exc:
+        raise _proxmox_error(exc) from exc
+
+    return {"proxmox_vmid": proxmox_vmid, "raw_status": raw}
 
 
-def list_proxmox_node_mappings(db: Session) -> schemas.ProxmoxNodeMappingListResponse:
-    rows = db.query(ProxmoxNodeMapping).order_by(
-        ProxmoxNodeMapping.physical_node).all()
-    return schemas.ProxmoxNodeMappingListResponse(
-        items=[
-            schemas.ProxmoxNodeMappingResponse(
-                id=r.id,
-                physical_node=r.physical_node.value,
-                proxmox_node_name=r.proxmox_node_name,
-            )
-            for r in rows
-        ]
+# ─────────────────────── ISO ↔ Template Mapping ───────────────────────────
+
+def list_iso_proxmox_templates(db: Session) -> dict[str, Any]:
+    items = db.query(IsoProxmoxTemplate).all()
+    return {"items": items}
+
+
+def create_iso_proxmox_template(db: Session, body) -> IsoProxmoxTemplate:
+    existing = (
+        db.query(IsoProxmoxTemplate)
+        .filter(IsoProxmoxTemplate.iso_image_id == uuid.UUID(body.iso_image_id))
+        .first()
     )
+    if existing:
+        raise PolicyError("ISO", "Un mapping existe déjà pour cette ISO.", 409)
 
-
-def create_proxmox_node_mapping(
-    db: Session, body: schemas.ProxmoxNodeMappingCreate
-) -> schemas.ProxmoxNodeMappingResponse:
-    try:
-        pn = PhysicalNode(body.physical_node.upper())
-    except ValueError as e:
-        raise PolicyError(
-            "PROXMOX", "physical_node doit être REM, RAM ou EMILIA.", 422) from e
-    if db.query(ProxmoxNodeMapping).filter(ProxmoxNodeMapping.physical_node == pn).first():
-        raise PolicyError(
-            "PROXMOX", "Un mapping existe déjà pour ce nœud métier.", 409)
-    row = ProxmoxNodeMapping(
+    tpl = IsoProxmoxTemplate(
         id=uuid.uuid4(),
-        physical_node=pn,
-        proxmox_node_name=body.proxmox_node_name,
-    )
-    db.add(row)
-    db.commit()
-    db.refresh(row)
-    return schemas.ProxmoxNodeMappingResponse(
-        id=row.id,
-        physical_node=row.physical_node.value,
-        proxmox_node_name=row.proxmox_node_name,
-    )
-
-
-def patch_proxmox_node_mapping(
-    db: Session, mapping_id: uuid.UUID, body: schemas.ProxmoxNodeMappingPatch
-) -> schemas.ProxmoxNodeMappingResponse:
-    row = db.query(ProxmoxNodeMapping).filter(
-        ProxmoxNodeMapping.id == mapping_id).first()
-    if not row:
-        raise PolicyError("PROXMOX", "Mapping introuvable.", 404)
-    row.proxmox_node_name = body.proxmox_node_name
-    db.commit()
-    db.refresh(row)
-    return schemas.ProxmoxNodeMappingResponse(
-        id=row.id,
-        physical_node=row.physical_node.value,
-        proxmox_node_name=row.proxmox_node_name,
-    )
-
-
-def list_iso_proxmox_templates(db: Session) -> schemas.IsoProxmoxTemplateListResponse:
-    rows = db.query(IsoProxmoxTemplate).all()
-    return schemas.IsoProxmoxTemplateListResponse(
-        items=[schemas.IsoProxmoxTemplateResponse.model_validate(
-            r) for r in rows]
-    )
-
-
-def create_iso_proxmox_template(
-    db: Session, body: schemas.IsoProxmoxTemplateCreate
-) -> schemas.IsoProxmoxTemplateResponse:
-    if db.query(IsoProxmoxTemplate).filter(IsoProxmoxTemplate.iso_image_id == body.iso_image_id).first():
-        raise PolicyError(
-            "PROXMOX", "Un template existe déjà pour cette ISO.", 409)
-    row = IsoProxmoxTemplate(
-        id=uuid.uuid4(),
-        iso_image_id=body.iso_image_id,
+        iso_image_id=uuid.UUID(body.iso_image_id),
         proxmox_template_vmid=body.proxmox_template_vmid,
     )
-    db.add(row)
+    db.add(tpl)
     db.commit()
-    db.refresh(row)
-    return schemas.IsoProxmoxTemplateResponse.model_validate(row)
+    db.refresh(tpl)
+    return tpl
 
 
-def patch_iso_proxmox_template(
-    db: Session, template_id: uuid.UUID, body: schemas.IsoProxmoxTemplatePatch
-) -> schemas.IsoProxmoxTemplateResponse:
-    row = db.query(IsoProxmoxTemplate).filter(
-        IsoProxmoxTemplate.id == template_id).first()
-    if not row:
-        raise PolicyError(
-            "PROXMOX", "Correspondance ISO-template introuvable.", 404)
-    row.proxmox_template_vmid = body.proxmox_template_vmid
+def patch_iso_proxmox_template(db: Session, template_id, body) -> IsoProxmoxTemplate:
+    tpl = db.query(IsoProxmoxTemplate).filter(IsoProxmoxTemplate.id == template_id).first()
+    if not tpl:
+        raise PolicyError("ISO", "Mapping introuvable.", 404)
+    if body.proxmox_template_vmid is not None:
+        tpl.proxmox_template_vmid = body.proxmox_template_vmid
     db.commit()
-    db.refresh(row)
-    return schemas.IsoProxmoxTemplateResponse.model_validate(row)
+    db.refresh(tpl)
+    return tpl
+
+
+# ─────────────────────── Quota Override ───────────────────────────────────
+
+def apply_quota_override(db: Session, body, admin_id) -> None:
+    from horizon.shared.models import UserQuota
+
+    user_id = uuid.UUID(body.user_id)
+    quota = db.query(UserQuota).filter(UserQuota.user_id == user_id).first()
+    if not quota:
+        from horizon.shared.models import UserQuota
+        quota = UserQuota(id=uuid.uuid4(), user_id=user_id)
+        db.add(quota)
+
+    fields = [
+        "max_vcpu_per_vm", "max_ram_gb_per_vm", "max_storage_gb_per_vm",
+        "max_simultaneous_vms", "max_session_duration_hours",
+    ]
+    for f in fields:
+        val = getattr(body, f, None)
+        if val is not None:
+            setattr(quota, f, val)
+
+    db.flush()

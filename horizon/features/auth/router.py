@@ -15,7 +15,7 @@ router = APIRouter(prefix="/auth", tags=["Authentification"])
 @router.post("/login", response_model=schemas.TokenResponse, summary="Connexion utilisateur")
 def login(body: schemas.LoginRequest, request: Request, db: Session = Depends(get_db)):
     ip = request.client.host if request.client else "unknown"
-    user = auth_service.authenticate_user(db, body.username, body.password, ip)
+    user = auth_service.authenticate_user(db, body.email, body.password, ip)
     token = auth_service.create_access_token(
         str(user.id), user.role.value, user.must_change_pwd
     )

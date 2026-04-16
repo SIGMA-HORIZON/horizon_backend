@@ -1,10 +1,11 @@
-# Horizon — Postgres 15, Redis, migrations Alembic, API FastAPI
-
 services:
+
+  # ─── PostgreSQL ──────────────────────────────────────────────────────────
   db:
     image: postgres:15-alpine
     container_name: horizon_db
     restart: unless-stopped
+    env_file: .env
     environment:
       POSTGRES_DB: horizon_db
       POSTGRES_USER: horizon_user
@@ -12,36 +13,43 @@ services:
     volumes:
       - postgres_data:/var/lib/postgresql/data
     ports:
-      - "5432:5432"
+      - "127.0.0.1:5432:5432"     # Exposé uniquement en localhost
     healthcheck:
-      test: [ "CMD-SHELL", "pg_isready -U horizon_user -d horizon_db" ]
+      test: ["CMD-SHELL", "pg_isready -U horizon_user -d horizon_db"]
       interval: 10s
       timeout: 5s
       retries: 5
 
+  # ─── Redis ───────────────────────────────────────────────────────────────
   redis:
     image: redis:7-alpine
     container_name: horizon_redis
     restart: unless-stopped
-    command: redis-server --appendonly yes
+    command: redis-server --appendonly yes --maxmemory 256mb --maxmemory-policy allkeys-lru
     volumes:
       - redis_data:/data
     ports:
-      - "6379:6379"
+      - "127.0.0.1:6379:6379"
     healthcheck:
-      test: [ "CMD", "redis-cli", "ping" ]
+      test: ["CMD", "redis-cli", "ping"]
       interval: 10s
       timeout: 5s
       retries: 5
 
+  # ─── Migrations Alembic ──────────────────────────────────────────────────
   migrations:
     build: .
     container_name: horizon_migrations
     working_dir: /app
+    env_file: .env
     environment:
       DATABASE_URL: postgresql+psycopg2://horizon_user:horizon_pass@db:5432/horizon_db
     command: >
-      sh -c "alembic upgrade head && echo 'Migrations OK'"
+      sh -c "
+        echo 'Attente DB...' &&
+        alembic upgrade head &&
+        echo 'Migrations OK'
+      "
     depends_on:
       db:
         condition: service_healthy
@@ -50,30 +58,34 @@ services:
       - ./alembic.ini:/app/alembic.ini
     restart: "no"
 
-  seed:
-    build: .
-    container_name: horizon_seed
-    working_dir: /app
-    environment:
-      DATABASE_URL: postgresql+psycopg2://horizon_user:horizon_pass@db:5432/horizon_db
-    command: >
-      sh -c "python scripts/seed.py && echo 'Seed OK'"
-    depends_on:
-      migrations:
-        condition: service_completed_successfully
-    volumes:
-      - ./horizon:/app/horizon
-      - ./scripts:/app/scripts
-      - ./alembic.ini:/app/alembic.ini
-    profiles:
-      - seed
-    restart: "no"
+  # # ─── Seed (optionnel) ────────────────────────────────────────────────────
+  # seed:
+  #   build: .
+  #   container_name: horizon_seed
+  #   working_dir: /app
+  #   env_file: .env
+  #   environment:
+  #     DATABASE_URL: postgresql+psycopg2://horizon_user:horizon_pass@db:5432/horizon_db
+  #   command: >
+  #     sh -c "python scripts/seed.py && echo 'Seed OK'"
+  #   depends_on:
+  #     migrations:
+  #       condition: service_completed_successfully
+  #   volumes:
+  #     - ./horizon:/app/horizon
+  #     - ./scripts:/app/scripts
+  #     - ./alembic.ini:/app/alembic.ini
+  #   profiles:
+  #     - seed
+  #   restart: "no"
 
+  # ─── API FastAPI ─────────────────────────────────────────────────────────
   api:
     build: .
     container_name: horizon_api
     restart: unless-stopped
     working_dir: /app
+    env_file: .env
     environment:
       DATABASE_URL: postgresql+psycopg2://horizon_user:horizon_pass@db:5432/horizon_db
       REDIS_URL: redis://redis:6379/0
@@ -81,7 +93,7 @@ services:
     ports:
       - "8000:8000"
     volumes:
-      - ./horizon:/app/horizon
+      - ./horizon:/app/horizon      # hot-reload en dev (retirer en prod)
     depends_on:
       db:
         condition: service_healthy
@@ -90,11 +102,11 @@ services:
       migrations:
         condition: service_completed_successfully
     healthcheck:
-      test: [ "CMD", "curl", "-f", "http://localhost:8000/health" ]
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
       interval: 30s
       timeout: 10s
       retries: 3
-      start_period: 10s
+      start_period: 15s
 
 volumes:
   postgres_data:

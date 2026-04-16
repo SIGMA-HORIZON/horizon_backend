@@ -17,7 +17,7 @@ branch_labels = None
 depends_on = None
 
 _physical_node = postgresql.ENUM(
-    "REM", "RAM", "EMILIA", name="physical_node_enum", create_type=False
+    "MAITRE", "ESCLAVE", "REM", "RAM", "EMILIA", name="physical_node_enum", create_type=False
 )
 
 
@@ -68,7 +68,7 @@ def upgrade() -> None:
     )
 
     conn = op.get_bind()
-    for pn, name in [("REM", "pve-rem"), ("RAM", "pve-ram"), ("EMILIA", "pve-emilia")]:
+    for pn, name in [("MAITRE", "MAITRE"), ("ESCLAVE", "ESCLAVE"), ("REM", "pve-rem"), ("RAM", "pve-ram"), ("EMILIA", "pve-emilia")]:
         conn.execute(
             sa.text(
                 "INSERT INTO proxmox_node_mappings (id, physical_node, proxmox_node_name) "

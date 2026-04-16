@@ -62,7 +62,7 @@ def send_account_credentials(to: str, username: str, temp_password: str) -> None
         <p>Bonjour,</p>
         <p>Votre compte sur la plateforme <strong>Horizon ENSPY</strong> a été créé.</p>
         <table border="1" cellpadding="8">
-          <tr><td><b>Identifiant</b></td><td>{username}</td></tr>
+          <tr><td><b>Identifiant</b></td><td>UserName: {username} email: {to}</td></tr>
           <tr><td><b>Mot de passe provisoire</b></td><td><code>{temp_password}</code></td></tr>
         </table>
         <p><strong>Vous devrez changer ce mot de passe à votre première connexion.</strong></p>

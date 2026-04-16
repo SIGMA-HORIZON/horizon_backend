@@ -8,7 +8,7 @@ from pydantic import BaseModel, EmailStr, Field, field_validator, model_validato
 
 
 class LoginRequest(BaseModel):
-    username: str = Field(..., min_length=1)
+    email: EmailStr = Field(..., description="L'adresse email académique")
     password: str = Field(..., min_length=1)
 
 

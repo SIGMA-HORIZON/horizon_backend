@@ -1,64 +1,154 @@
-"""Schémas Pydantic — administration."""
+"""Schemas Pydantic — Administration (v2)."""
+
+from __future__ import annotations
 
 from datetime import datetime
-from typing import Any
 from uuid import UUID
 
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, Field
 
 
-class AdminVMRowResponse(BaseModel):
+# ─────────────────────── ISO Admin ────────────────────────────────────────
+
+class ISOValidateRequest(BaseModel):
+    """PATCH /admin/isos/{id}/validate"""
+    note: str | None = Field(None, max_length=512, description="Note de validation optionnelle")
+
+
+class ISORejectRequest(BaseModel):
+    reason: str = Field(..., min_length=5, max_length=512)
+
+
+class ISOAdminResponse(BaseModel):
+    model_config = {"from_attributes": True}
+    id: UUID
+    name: str
+    filename: str
+    os_family: str
+    os_version: str
+    status: str
+    source_url: str | None
+    proxmox_node: str | None
+    proxmox_storage: str | None
+    proxmox_upid: str | None
+    size_bytes: int | None
+    error_message: str | None
+    created_at: datetime
+    created_by_id: UUID | None
+
+    @classmethod
+    def _enum_str(cls, v):
+        return v.value if hasattr(v, "value") else v
+
+    from pydantic import field_validator
+
+    @field_validator("os_family", "status", mode="before")
+    @classmethod
+    def enum_to_str(cls, v):
+        return v.value if hasattr(v, "value") else v
+
+
+class ISOAdminListResponse(BaseModel):
+    items: list[ISOAdminResponse]
+    total: int
+
+
+# ─────────────────────── Cluster Monitoring ───────────────────────────────
+
+class NodeInfoResponse(BaseModel):
+    name: str
+    cpu_usage_pct: float
+    mem_used_gb: float
+    mem_total_gb: float
+    mem_free_gb: float
+    vm_count: int
+
+
+class ClusterSummaryResponse(BaseModel):
+    nodes: list[NodeInfoResponse]
+    total_nodes: int
+    total_vms: int
+
+
+# ─────────────────────── Node Mappings (conservé) ─────────────────────────
+
+class ProxmoxNodeMappingResponse(BaseModel):
+    model_config = {"from_attributes": True}
+    id: UUID
+    proxmox_node_name: str
+    description: str | None = None
+
+
+class ProxmoxNodeMappingListResponse(BaseModel):
+    items: list[ProxmoxNodeMappingResponse]
+
+
+# ─────────────────────── VM Admin ─────────────────────────────────────────
+
+class AdminVMResponse(BaseModel):
+    model_config = {"from_attributes": True}
     id: UUID
     proxmox_vmid: int
     name: str
-    owner_username: str | None = None
-    node: str
+    status: str
+    proxmox_node: str
     vcpu: int
     ram_gb: float
     storage_gb: float
-    status: str
+    owner_id: UUID
+    lease_start: datetime
     lease_end: datetime
-    ip_address: str | None = None
+
+    from pydantic import field_validator
+
+    @field_validator("status", mode="before")
+    @classmethod
+    def status_str(cls, v):
+        return v.value if hasattr(v, "value") else v
 
 
 class AdminVMListResponse(BaseModel):
-    items: list[AdminVMRowResponse]
+    items: list[AdminVMResponse]
+    total: int
+
+
+class AdminForceStopResponse(BaseModel):
+    message: str
+    upid: str | None = None
 
 
 class ForceStopRequest(BaseModel):
-    reason: str | None = Field(default="Arrêt forcé par administrateur")
+    reason: str | None = None
 
+
+# ─────────────────────── Quota ────────────────────────────────────────────
 
 class QuotaOverrideRequest(BaseModel):
     user_id: str
     max_vcpu_per_vm: int | None = None
     max_ram_gb_per_vm: float | None = None
     max_storage_gb_per_vm: float | None = None
-    max_shared_space_gb: float | None = None
     max_simultaneous_vms: int | None = None
     max_session_duration_hours: int | None = None
-    reason: str
+    reason: str | None = None
 
 
 class QuotaOverrideMessageResponse(BaseModel):
     message: str
 
 
-class AdminForceStopResponse(BaseModel):
-    message: str
-
+# ─────────────────────── Audit / Incidents ────────────────────────────────
 
 class AuditLogResponse(BaseModel):
     model_config = {"from_attributes": True}
-
     id: UUID
-    actor_id: UUID | None
+    timestamp: datetime
     action: str
     target_type: str | None
     target_id: UUID | None
-    ip_address: str | None
-    log_metadata: dict[str, Any] | None = None
-    timestamp: datetime
+    user_id: UUID | None
+
+    from pydantic import field_validator
 
     @field_validator("action", mode="before")
     @classmethod
@@ -74,21 +164,15 @@ class AuditLogListResponse(BaseModel):
 
 class SecurityIncidentResponse(BaseModel):
     model_config = {"from_attributes": True}
-
     id: UUID
-    vm_id: UUID | None
-    user_id: UUID | None
-    incident_type: str
-    severity: str
     status: str
-    description: str | None
     created_at: datetime
-    resolved_at: datetime | None
-    resolved_by_id: UUID | None
 
-    @field_validator("incident_type", "severity", "status", mode="before")
+    from pydantic import field_validator
+
+    @field_validator("status", mode="before")
     @classmethod
-    def enum_str(cls, v):
+    def status_str(cls, v):
         return v.value if hasattr(v, "value") else v
 
 
@@ -98,65 +182,34 @@ class SecurityIncidentListResponse(BaseModel):
 
 class QuotaViolationResponse(BaseModel):
     model_config = {"from_attributes": True}
-
     id: UUID
-    vm_id: UUID | None
-    user_id: UUID
-    violation_type: str
-    sanction_level: str
-    observed_value: float
-    limit_value: float
     resolved: bool
     created_at: datetime
-
-    @field_validator("violation_type", "sanction_level", mode="before")
-    @classmethod
-    def enum_str(cls, v):
-        return v.value if hasattr(v, "value") else v
 
 
 class QuotaViolationListResponse(BaseModel):
     items: list[QuotaViolationResponse]
 
 
+# ─────────────────────── Proxmox raw ops ──────────────────────────────────
+
 class ProxmoxOperationResponse(BaseModel):
-    status: str
     message: str
+    upid: str | None = None
 
 
 class ProxmoxQemuListResponse(BaseModel):
-    count: int
-    items: list[dict[str, Any]]
+    node: str
+    vms: list[dict]
 
 
 class ProxmoxVmStatusResponse(BaseModel):
-    data: dict[str, Any]
-
-
-class ProxmoxNodeMappingResponse(BaseModel):
-    model_config = {"from_attributes": True}
-
-    id: UUID
-    physical_node: str
-    proxmox_node_name: str
-
-
-class ProxmoxNodeMappingListResponse(BaseModel):
-    items: list[ProxmoxNodeMappingResponse]
-
-
-class ProxmoxNodeMappingCreate(BaseModel):
-    physical_node: str = Field(..., description="REM, RAM ou EMILIA")
-    proxmox_node_name: str = Field(..., min_length=1, max_length=64)
-
-
-class ProxmoxNodeMappingPatch(BaseModel):
-    proxmox_node_name: str = Field(..., min_length=1, max_length=64)
+    proxmox_vmid: int
+    raw_status: dict
 
 
 class IsoProxmoxTemplateResponse(BaseModel):
     model_config = {"from_attributes": True}
-
     id: UUID
     iso_image_id: UUID
     proxmox_template_vmid: int
@@ -167,9 +220,9 @@ class IsoProxmoxTemplateListResponse(BaseModel):
 
 
 class IsoProxmoxTemplateCreate(BaseModel):
-    iso_image_id: UUID
-    proxmox_template_vmid: int = Field(..., ge=1)
+    iso_image_id: str
+    proxmox_template_vmid: int
 
 
 class IsoProxmoxTemplatePatch(BaseModel):
-    proxmox_template_vmid: int = Field(..., ge=1)
+    proxmox_template_vmid: int | None = None

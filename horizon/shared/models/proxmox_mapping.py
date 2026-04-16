@@ -4,10 +4,10 @@ import uuid
 
 from sqlalchemy import Column, Enum as PgEnum, ForeignKey, Integer, String, UniqueConstraint
 from sqlalchemy.dialects.postgresql import UUID
+from horizon.shared.models.virtual_machine import PhysicalNode
 from sqlalchemy.orm import relationship
 
 from horizon.shared.models.base import Base, TimestampMixin
-from horizon.shared.models.virtual_machine import PhysicalNode
 
 
 class IsoProxmoxTemplate(Base, TimestampMixin):
@@ -35,9 +35,8 @@ class ProxmoxNodeMapping(Base, TimestampMixin):
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     physical_node = Column(
-        PgEnum(PhysicalNode, name="physical_node_enum",
-               create_constraint=False),
-        nullable=False,
-        unique=True,
-    )
+            PgEnum(PhysicalNode, name="physical_node_enum", create_constraint=False),
+            nullable=False,
+            unique=True,
+        )
     proxmox_node_name = Column(String(64), nullable=False)
