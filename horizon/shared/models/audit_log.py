@@ -52,7 +52,7 @@ class AuditLog(Base):
     target_type = Column(String(64), nullable=True)
     target_id = Column(UUID(as_uuid=True), nullable=True, index=True)
     ip_address = Column(String(45), nullable=True)
-    # Colonne SQL "metadata" — nom Python log_metadata (réservé sur DeclarativeBase)
+    # Colonne SQL "metadata" - nom Python log_metadata (réservé sur DeclarativeBase)
     log_metadata = Column("metadata", JSONB, nullable=True)
     timestamp = Column(DateTime(timezone=True), nullable=False, index=True)
 

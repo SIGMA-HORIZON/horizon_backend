@@ -1,5 +1,5 @@
 """
-Horizon API — point d'entrée FastAPI
+Horizon API - point d'entrée FastAPI
 POL-SIGMA-HORIZON-v1.0
 """
 
@@ -23,24 +23,24 @@ settings = get_settings()
 
 logging.basicConfig(
     level=logging.DEBUG if settings.APP_DEBUG else logging.INFO,
-    format="%(asctime)s [%(levelname)s] %(name)s — %(message)s",
+    format="%(asctime)s [%(levelname)s] %(name)s - %(message)s",
 )
 logger = logging.getLogger("horizon.main")
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    logger.info("Horizon API — Démarrage...")
+    logger.info("Horizon API - Démarrage...")
     start_scheduler()
     yield
-    logger.info("Horizon API — Arrêt...")
+    logger.info("Horizon API - Arrêt...")
     stop_scheduler()
 
 
 app = FastAPI(
     title="Horizon API",
     description=(
-        "API de gestion de machines virtuelles — Projet SIGMA / ENSPY\n\n"
+        "API de gestion de machines virtuelles - Projet SIGMA / ENSPY\n\n"
         "Politique de référence : **POL-SIGMA-HORIZON-v1.0**\n\n"
         "Préfixe des routes métier : **`/api/v1`**"
     ),
@@ -83,11 +83,19 @@ from fastapi.exceptions import RequestValidationError
 
 @app.exception_handler(RequestValidationError)
 async def validation_exception_handler(request: Request, exc: RequestValidationError):
+    # Correction : Pydantic v2 peut inclure des objets Exception dans 'ctx', non sérialisables par défaut.
+    errors = exc.errors()
+    for error in errors:
+        if "ctx" in error:
+            for k, v in error["ctx"].items():
+                if isinstance(v, Exception):
+                    error["ctx"][k] = str(v)
+    
     with open('/tmp/horizon_debug.log', 'a') as f:
-        f.write(f"ValidationError: {exc.errors()}\n")
+        f.write(f"ValidationError: {errors}\n")
     return JSONResponse(
         status_code=422,
-        content={"detail": exc.errors()}
+        content={"detail": errors}
     )
 
 @app.exception_handler(Exception)
@@ -116,5 +124,5 @@ def health_check():
 @app.get("/", tags=["Système"], include_in_schema=False)
 def root():
     return {
-        "message": "Horizon API — SIGMA / ENSPY. Documentation : /docs — API métier : /api/v1"
+        "message": "Horizon API - SIGMA / ENSPY. Documentation : /docs - API métier : /api/v1"
     }

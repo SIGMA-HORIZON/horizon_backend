@@ -1,4 +1,4 @@
-"""Initial schema — all Horizon tables
+"""Initial schema - all Horizon tables
 
 Revision ID: 0001
 Revises: 

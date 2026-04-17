@@ -1,4 +1,4 @@
-"""Schémas Pydantic — administration."""
+"""Schémas Pydantic - administration."""
 
 from datetime import datetime
 from typing import Any

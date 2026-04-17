@@ -6,7 +6,7 @@ from typing import Optional
 from fastapi import HTTPException, status
 
 from horizon.core.config import get_settings
-from horizon.core.constants import CHANGE_PASSWORD_PATH
+from horizon.core.constants import CHANGE_PASSWORD_PATH, ME_PATH
 
 settings = get_settings()
 
@@ -57,7 +57,7 @@ def enforce_account_active(is_active: bool) -> None:
 
 
 def enforce_must_change_password(must_change_pwd: bool, path: str) -> None:
-    if must_change_pwd and path != CHANGE_PASSWORD_PATH:
+    if must_change_pwd and path not in [CHANGE_PASSWORD_PATH, ME_PATH]:
         raise PolicyError(
             "POL-COMPTE-02",
             "Vous devez changer votre mot de passe provisoire avant d'accéder à la plateforme.",

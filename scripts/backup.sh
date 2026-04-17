@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # =============================================================================
-# Horizon — Script de sauvegarde PostgreSQL
+# Horizon - Script de sauvegarde PostgreSQL
 # Usage   : ./backup.sh [--compress] [--output-dir /path/to/backups]
 # Prérequis: pg_dump, gzip (optionnel), variables d'env ou .env
 # =============================================================================
@@ -33,7 +33,7 @@ mkdir -p "${BACKUP_DIR}"
 exec > >(tee -a "${LOG_FILE}") 2>&1
 
 echo "=============================================="
-echo " Horizon DB — Backup ${TIMESTAMP}"
+echo " Horizon DB - Backup ${TIMESTAMP}"
 echo " DB     : ${DB_NAME}@${DB_HOST}:${DB_PORT}"
 echo " Dest   : ${BACKUP_DIR}"
 echo " Compress: ${COMPRESS}"

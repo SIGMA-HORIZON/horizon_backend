@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # =============================================================================
-# Horizon — Script de restauration PostgreSQL
+# Horizon - Script de restauration PostgreSQL
 # Usage   : ./restore.sh --file /path/to/horizon_backup_YYYYMMDD_HHMMSS.sql[.gz]
 # ATTENTION: Supprime et recrée la base cible. Utiliser avec précaution.
 # =============================================================================
@@ -41,7 +41,7 @@ fi
 exec > >(tee -a "${LOG_FILE}") 2>&1
 
 echo "=============================================="
-echo " Horizon DB — Restauration ${TIMESTAMP}"
+echo " Horizon DB - Restauration ${TIMESTAMP}"
 echo " Source : ${BACKUP_FILE}"
 echo " Cible  : ${DB_NAME}@${DB_HOST}:${DB_PORT}"
 echo "=============================================="
@@ -52,10 +52,10 @@ echo "[ATTENTION] Cette opération va SUPPRIMER et RECRÉER la base ${DB_NAME}."
 CHECKSUM_FILE="${BACKUP_FILE}.sha256"
 if [ -f "${CHECKSUM_FILE}" ]; then
     echo "[$(date '+%H:%M:%S')] Vérification du checksum SHA256..."
-    sha256sum --check "${CHECKSUM_FILE}" || { echo "[ERROR] Checksum invalide — fichier corrompu."; exit 1; }
+    sha256sum --check "${CHECKSUM_FILE}" || { echo "[ERROR] Checksum invalide - fichier corrompu."; exit 1; }
     echo "[$(date '+%H:%M:%S')] Checksum OK."
 else
-    echo "[WARN] Fichier .sha256 absent — vérification du checksum ignorée."
+    echo "[WARN] Fichier .sha256 absent - vérification du checksum ignorée."
 fi
 
 # ------------------------------------------------------------------ CONFIRMATION

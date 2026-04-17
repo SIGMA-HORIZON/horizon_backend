@@ -1,4 +1,4 @@
-"""Schémas Pydantic — VMs utilisateur."""
+"""Schémas Pydantic - VMs utilisateur."""
 
 from datetime import datetime
 from uuid import UUID

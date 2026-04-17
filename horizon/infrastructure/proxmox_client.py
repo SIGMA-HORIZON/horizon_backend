@@ -1,4 +1,4 @@
-"""Client API Proxmox (proxmoxer) — utilisé seulement si PROXMOX_ENABLED."""
+"""Client API Proxmox (proxmoxer) - utilisé seulement si PROXMOX_ENABLED."""
 
 from __future__ import annotations
 
@@ -13,7 +13,7 @@ logger = logging.getLogger("horizon.proxmox")
 
 
 class ProxmoxIntegrationError(Exception):
-    """Erreur d'appel Proxmox — convertie en PolicyError côté métier."""
+    """Erreur d'appel Proxmox - convertie en PolicyError côté métier."""
 
     def __init__(self, message: str, status_code: int = 502) -> None:
         super().__init__(message)
@@ -72,12 +72,18 @@ class ProxmoxClient:
         memory_mb: int,
         cores: int,
         net0: str,
+        ssh_key: str | None = None,
     ) -> dict[str, Any]:
         try:
             n = self._nodes(node)
             n.qemu(template_vmid).clone.post(newid=new_vmid, name=name, full=1)
-            n.qemu(new_vmid).config.post(
-                memory=memory_mb, cores=cores, net0=net0)
+            
+            config_params = {"memory": memory_mb, "cores": cores, "net0": net0}
+            if ssh_key:
+                # Injection via Cloud-Init (nécessite que le template ait Cloud-Init)
+                config_params["sshkeys"] = ssh_key
+                
+            n.qemu(new_vmid).config.post(**config_params)
             n.qemu(new_vmid).status.start.post()
             return {"status": "success", "message": f"VM {name} ({new_vmid}) clonée et démarrée."}
         except Exception as e:

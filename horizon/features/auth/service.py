@@ -1,4 +1,4 @@
-"""Authentification — JWT, bcrypt, lockout."""
+"""Authentification - JWT, bcrypt, lockout."""
 
 import secrets
 import string

@@ -27,7 +27,7 @@ router = APIRouter(prefix="/admin", tags=["Administration"])
 @router.get(
     "/vms",
     response_model=schemas.AdminVMListResponse,
-    summary="[Admin] Dashboard global — toutes les VMs",
+    summary="[Admin] Dashboard global - toutes les VMs",
 )
 def admin_list_vms(admin: AdminUser, db: Session = Depends(get_db)):
     return admin_service.build_admin_vm_dashboard(db)
@@ -150,7 +150,7 @@ def get_violations(
 @router.post(
     "/proxmox/vms/{proxmox_vmid}/pause",
     response_model=schemas.ProxmoxOperationResponse,
-    summary="[Admin] Pause Proxmox (suspend) — proxmox_vmid Horizon",
+    summary="[Admin] Pause Proxmox (suspend) - proxmox_vmid Horizon",
 )
 def admin_proxmox_pause(proxmox_vmid: int, admin: AdminUser, db: Session = Depends(get_db)):
     return admin_service.admin_proxmox_pause_by_vmid(db, proxmox_vmid)
@@ -168,7 +168,7 @@ def admin_proxmox_list_qemu(node_name: str, admin: AdminUser, db: Session = Depe
 @router.get(
     "/proxmox/vms/{proxmox_vmid}/status",
     response_model=schemas.ProxmoxVmStatusResponse,
-    summary="[Admin] Statut courant Proxmox (current) — proxmox_vmid Horizon",
+    summary="[Admin] Statut courant Proxmox (current) - proxmox_vmid Horizon",
 )
 def admin_proxmox_status(proxmox_vmid: int, admin: AdminUser, db: Session = Depends(get_db)):
     return admin_service.admin_proxmox_vm_status(db, proxmox_vmid)

@@ -303,7 +303,7 @@ def start_scheduler():
         replace_existing=True,
     )
     scheduler.start()
-    logger.info("Horizon Scheduler démarré — toutes les tâches planifiées actives.")
+    logger.info("Horizon Scheduler démarré - toutes les tâches planifiées actives.")
 
 
 def stop_scheduler():

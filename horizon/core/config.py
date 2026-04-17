@@ -1,5 +1,5 @@
 """
-Horizon — Configuration (Pydantic v2 BaseSettings)
+Horizon - Configuration (Pydantic v2 BaseSettings)
 Politiques POL-SIGMA-HORIZON-v1.0
 """
 
@@ -69,7 +69,7 @@ class Settings(BaseSettings):
     HARD_LIMIT_SESSION_HOURS: int = 72
     HARD_LIMIT_SHARED_SPACE_GB: float = 20.0
 
-    # Proxmox — désactivé par défaut (aucun appel API, comportement métier inchangé)
+    # Proxmox - désactivé par défaut (aucun appel API, comportement métier inchangé)
     PROXMOX_ENABLED: bool = False
     PROXMOX_HOST: str = ""
     PROXMOX_USER: str = ""

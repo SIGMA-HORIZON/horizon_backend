@@ -19,6 +19,7 @@ from horizon.shared.models import (
     VirtualMachine,
     VMStatus,
 )
+from horizon.infrastructure.ssh_utils import generate_ssh_key_pair
 from horizon.shared.policies.enforcer import (
     PolicyError,
     enforce_hard_limits,
@@ -131,6 +132,10 @@ def create_vm(db: Session, owner_id, data: dict) -> VirtualMachine:
     )
     db.add(reservation)
 
+    # Génération d'une paire de clés SSH spécifique à cette VM
+    private_key, public_key = generate_ssh_key_pair()
+    vm.ssh_public_key = private_key  # Stockée temporairement pour le téléchargement unique
+
     try:
         db.flush()
 
@@ -162,6 +167,7 @@ def create_vm(db: Session, owner_id, data: dict) -> VirtualMachine:
                     memory_mb,
                     data["vcpu"],
                     net0,
+                    ssh_key=public_key,
                 )
             except ProxmoxIntegrationError as e:
                 raise PolicyError("PROXMOX", e.message, e.status_code) from e
