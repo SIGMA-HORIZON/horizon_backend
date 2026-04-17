@@ -173,3 +173,21 @@ class IsoProxmoxTemplateCreate(BaseModel):
 
 class IsoProxmoxTemplatePatch(BaseModel):
     proxmox_template_vmid: int = Field(..., ge=1)
+
+
+class ProxmoxNodeSummary(BaseModel):
+    name: str
+    status: str
+    cpu: float
+    memory: dict[str, Any]
+    vms_count: int
+
+
+class ProxmoxSummaryResponse(BaseModel):
+    nodes: list[ProxmoxNodeSummary]
+    total_vms: int
+    active_vms: int
+    total_cpus: int
+    used_cpus: int
+    total_memory: int
+    used_memory: int

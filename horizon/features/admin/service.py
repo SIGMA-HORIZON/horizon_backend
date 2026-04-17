@@ -232,3 +232,18 @@ def patch_iso_proxmox_template(
     db.commit()
     db.refresh(row)
     return schemas.IsoProxmoxTemplateResponse.model_validate(row)
+
+
+def get_proxmox_summary() -> schemas.ProxmoxSummaryResponse:
+    from horizon.infrastructure.proxmox_client import (
+        ProxmoxClient,
+        ProxmoxIntegrationError,
+    )
+
+    _require_proxmox_enabled()
+    try:
+        client = ProxmoxClient()
+        data = client.get_cluster_status()
+        return schemas.ProxmoxSummaryResponse(**data)
+    except ProxmoxIntegrationError as e:
+        raise PolicyError("PROXMOX", e.message, e.status_code) from e

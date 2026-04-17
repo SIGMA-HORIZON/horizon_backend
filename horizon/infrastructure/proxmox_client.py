@@ -135,3 +135,43 @@ class ProxmoxClient:
         except Exception as e:
             logger.exception("get_vm_current_status")
             raise ProxmoxIntegrationError(str(e), 502) from e
+
+    def get_cluster_status(self) -> dict[str, Any]:
+        """Récupère un résumé global du datacenter Proxmox."""
+        if not self._api:
+            raise ProxmoxIntegrationError("Proxmox désactivé.", 503)
+        try:
+            nodes = self._api.nodes.get()
+            summary = {
+                "nodes": [],
+                "total_vms": 0,
+                "active_vms": 0,
+                "total_cpus": 0,
+                "used_cpus": 0,
+                "total_memory": 0,
+                "used_memory": 0
+            }
+
+            for node in nodes:
+                n_vms = []
+                if node["status"] == "online":
+                    n_vms = self._api.nodes(node["node"]).qemu.get()
+                    summary["total_vms"] += len(n_vms)
+                    summary["active_vms"] += sum(1 for v in n_vms if v["status"] == "running")
+
+                n_info = {
+                    "name": node["node"],
+                    "status": node["status"],
+                    "cpu": node.get("cpu", 0),
+                    "memory": {
+                        "total": node.get("maxmem", 0),
+                        "used": node.get("mem", 0)
+                    },
+                    "vms_count": len(n_vms) if node["status"] == "online" else 0
+                }
+                summary["nodes"].append(n_info)
+
+            return summary
+        except Exception as e:
+            logger.exception("get_cluster_status")
+            raise ProxmoxIntegrationError(str(e), 502) from e

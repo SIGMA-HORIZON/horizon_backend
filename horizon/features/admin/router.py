@@ -242,3 +242,12 @@ def patch_iso_template(
     db: Session = Depends(get_db),
 ):
     return admin_service.patch_iso_proxmox_template(db, template_id, body)
+
+
+@router.get(
+    "/proxmox/summary",
+    response_model=schemas.ProxmoxSummaryResponse,
+    summary="[Admin] Résumé global du cluster Proxmox (Temps Réel)",
+)
+def admin_proxmox_summary(admin: AdminUser):
+    return admin_service.get_proxmox_summary()
