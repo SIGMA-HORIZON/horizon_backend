@@ -30,7 +30,9 @@ router = APIRouter(prefix="/vms", tags=["Machines Virtuelles"])
 
 def _policy_to_http(exc: PolicyError):
     from fastapi import HTTPException
-    raise HTTPException(status_code=exc.http_status, detail=exc.message)
+    status = getattr(exc, 'http_status', 400)
+    message = getattr(exc, 'message', str(exc))
+    raise HTTPException(status_code=status, detail=message)
 
 
 # ─────────────────────────── Templates (Parcours A) ───────────────────────

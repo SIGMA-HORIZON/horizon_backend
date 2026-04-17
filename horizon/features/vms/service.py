@@ -57,7 +57,9 @@ def _proxmox_error_to_policy(exc) -> PolicyError:
 
 
 def _build_net0(vlan_id: int | None, base: str) -> str:
-    return f"{base},tag={vlan_id}" if vlan_id else base
+    # return f"{base},tag={vlan_id}" if vlan_id else base
+    return base
+
 
 
 def _next_proxmox_vmid(db: Session) -> int:

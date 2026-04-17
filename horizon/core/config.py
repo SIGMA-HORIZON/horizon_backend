@@ -79,6 +79,7 @@ class Settings(BaseSettings):
     PROXMOX_USER: str = ""          # ex: horizon@pve ou horizon@pam
     PROXMOX_TOKEN_ID: str = ""      # nom du token API (ex: "horizon-token")
     PROXMOX_TOKEN_SECRET: str = ""  # valeur UUID du token
+    PROXMOX_PASSWORD: str | None = None
     PROXMOX_VERIFY_SSL: bool = False
 
     # Sélection de nœud automatique
@@ -89,7 +90,7 @@ class Settings(BaseSettings):
     PROXMOX_DISK_STORAGE: str = "local-lvm"     # stockage disques VM
 
     # Réseau
-    PROXMOX_NET0_TEMPLATE: str = "virtio,bridge=vmbr0"
+    PROXMOX_NET0_TEMPLATE: str = "virtio,bridge=vmbr0,firewall=1"
 
     # Fallback VMID (si next_free_vmid Proxmox indisponible)
     PROXMOX_VMID_BASE: int = 200

@@ -82,7 +82,7 @@ class DeployTemplateRequest(BaseModel):
     memory_mb: int = Field(2048, ge=512, description="RAM en Mo")
     cores: int = Field(2, ge=1, le=64, description="Nombre de cœurs vCPU")
     disk_storage: str = Field("local-lvm", description="Stockage cible pour le clone")
-    net0: str = Field("virtio,bridge=vmbr0", description="Config réseau (format Proxmox)")
+    net0: str = Field("virtio,bridge=vmbr0,firewall=1", description="Config réseau (format Proxmox)")
     node_strategy: str = Field("least_vms", description="Stratégie de sélection de nœud")
     cloud_init: CloudInitConfig
 
@@ -110,7 +110,7 @@ class CreateManualRequest(BaseModel):
     storage_gb: int = Field(..., ge=1)
     disk_storage: str = Field("local-lvm")
     iso_id: UUID = Field(..., description="UUID de l'ISO validée en base")
-    net0: str = Field("virtio,bridge=vmbr0")
+    net0: str = Field("virtio,bridge=vmbr0,firewall=1")
     bios: str = Field("seabios")
     ostype: str = Field("l26")
     node_strategy: str = Field("least_vms")

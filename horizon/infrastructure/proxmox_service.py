@@ -90,12 +90,19 @@ class ProxmoxService:
 
         h = self._settings.PROXMOX_HOST
         u = self._settings.PROXMOX_USER
-        tid = self._settings.PROXMOX_TOKEN_ID
-        ts = self._settings.PROXMOX_TOKEN_SECRET
+        p = self._settings.PROXMOX_PASSWORD
+        # tid = self._settings.PROXMOX_TOKEN_ID
+        # ts = self._settings.PROXMOX_TOKEN_SECRET
 
-        if not all([h, u, tid, ts]):
+        # if not all([h, u, tid, ts]):
+        #     raise ProxmoxError(
+        #         "Configuration Proxmox incomplète (host / user / token_id / token_secret).",
+        #         500,
+        #     )
+        
+        if not all([h, u, p]):
             raise ProxmoxError(
-                "Configuration Proxmox incomplète (host / user / token_id / token_secret).",
+                "Configuration Proxmox incomplète (host / user / password).",
                 500,
             )
 
@@ -105,19 +112,28 @@ class ProxmoxService:
         try:
             from proxmoxer import ProxmoxAPI  # type: ignore
 
+            # self._api = ProxmoxAPI(
+            #     h,
+            #     user=u,
+            #     token_name=tid,
+            #     token_value=ts,
+            #     verify_ssl=self._settings.PROXMOX_VERIFY_SSL,
+            # )
+
             self._api = ProxmoxAPI(
                 h,
                 user=u,
-                token_name=tid,
-                token_value=ts,
+                password=p, # On utilise password ici
                 verify_ssl=self._settings.PROXMOX_VERIFY_SSL,
             )
+
             # Vérification rapide de connectivité
             self._api.version.get()
+            logger.info("======= ProxmoxService ========\n===>\n====>\n=====> Connexion réussie via mot de passe")
         except ProxmoxError:
             raise
         except Exception as exc:
-            logger.exception("ProxmoxService — connexion échouée")
+            logger.exception("ProxmoxService connexion échouée")
             raise ProxmoxError(f"Connexion Proxmox impossible : {exc}", 502) from exc
 
     # ──────────────────────────── Propriétés ───────────────────────────────
@@ -348,7 +364,7 @@ class ProxmoxService:
         n = api.nodes(node)
 
         try:
-            logger.info("create_vm_manual — vmid=%d sur %s", vmid, node)
+            logger.info("===\n==\n==\n==\n==\n==create_vm_manual==\n==\n==> vmid=%d sur %s", vmid, node)
 
             create_upid: str = n.qemu.post(
                 vmid=vmid,
@@ -361,12 +377,13 @@ class ProxmoxService:
                 ostype=ostype,
                 net0=net0,
                 # Disque principal
-                **{f"scsi0": f"{disk_storage}:{disk_size_gb},format=qcow2"},
-                scsihw="virtio-scsi-pci",
+                # **{f"scsi0": f"{disk_storage}:{disk_size_gb},format=qcow2"},
+                **{f"scsi0": f"{disk_storage}:{disk_size_gb}"},
+                scsihw="virtio-scsi-single",
                 # Lecteur CD-ROM
                 ide2=f"{iso_path},media=cdrom",
                 boot=boot_order,
-                agent="enabled=1",
+                agent="enabled=0",
             )
             logger.info("create_vm_manual — upid=%s", create_upid)
             return create_upid
