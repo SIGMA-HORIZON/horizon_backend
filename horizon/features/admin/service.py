@@ -9,6 +9,7 @@ from horizon.features.admin import schemas
 from horizon.features.vms import service as vm_service
 from horizon.features.vms.service import _resolve_proxmox_node_name
 from horizon.shared.models import (
+    ISOImage,
     IsoProxmoxTemplate,
     ProxmoxNodeMapping,
     QuotaOverride,
@@ -197,10 +198,12 @@ def patch_proxmox_node_mapping(
 
 def list_iso_proxmox_templates(db: Session) -> schemas.IsoProxmoxTemplateListResponse:
     rows = db.query(IsoProxmoxTemplate).all()
-    return schemas.IsoProxmoxTemplateListResponse(
-        items=[schemas.IsoProxmoxTemplateResponse.model_validate(
-            r) for r in rows]
-    )
+    items = []
+    for r in rows:
+        item = schemas.IsoProxmoxTemplateResponse.model_validate(r)
+        item.iso_name = r.iso_image.name if r.iso_image else "Inconnu"
+        items.append(item)
+    return schemas.IsoProxmoxTemplateListResponse(items=items)
 
 
 def create_iso_proxmox_template(
@@ -217,7 +220,9 @@ def create_iso_proxmox_template(
     db.add(row)
     db.commit()
     db.refresh(row)
-    return schemas.IsoProxmoxTemplateResponse.model_validate(row)
+    res = schemas.IsoProxmoxTemplateResponse.model_validate(row)
+    res.iso_name = row.iso_image.name if row.iso_image else "Inconnu"
+    return res
 
 
 def patch_iso_proxmox_template(
@@ -231,7 +236,27 @@ def patch_iso_proxmox_template(
     row.proxmox_template_vmid = body.proxmox_template_vmid
     db.commit()
     db.refresh(row)
-    return schemas.IsoProxmoxTemplateResponse.model_validate(row)
+    res = schemas.IsoProxmoxTemplateResponse.model_validate(row)
+    res.iso_name = row.iso_image.name if row.iso_image else "Inconnu"
+    return res
+
+
+def list_iso_images(db: Session) -> schemas.ISOImageListResponse:
+    rows = db.query(ISOImage).order_by(ISOImage.created_at.desc()).all()
+    return schemas.ISOImageListResponse(
+        items=[schemas.ISOImageResponse.model_validate(r) for r in rows]
+    )
+
+
+def create_iso_image(db: Session, body: schemas.ISOImageCreate) -> schemas.ISOImageResponse:
+    row = ISOImage(
+        id=uuid.uuid4(),
+        **body.model_dump()
+    )
+    db.add(row)
+    db.commit()
+    db.refresh(row)
+    return schemas.ISOImageResponse.model_validate(row)
 
 
 def get_proxmox_summary() -> schemas.ProxmoxSummaryResponse:

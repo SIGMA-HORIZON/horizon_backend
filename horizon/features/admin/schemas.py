@@ -159,6 +159,7 @@ class IsoProxmoxTemplateResponse(BaseModel):
 
     id: UUID
     iso_image_id: UUID
+    iso_name: str | None = None
     proxmox_template_vmid: int
 
 
@@ -173,6 +174,30 @@ class IsoProxmoxTemplateCreate(BaseModel):
 
 class IsoProxmoxTemplatePatch(BaseModel):
     proxmox_template_vmid: int = Field(..., ge=1)
+
+
+class ISOImageResponse(BaseModel):
+    model_config = {"from_attributes": True}
+    id: UUID
+    name: str
+    filename: str
+    os_family: str
+    os_version: str
+    description: str | None
+    is_active: bool
+    created_at: datetime
+
+
+class ISOImageListResponse(BaseModel):
+    items: list[ISOImageResponse]
+
+
+class ISOImageCreate(BaseModel):
+    name: str
+    filename: str
+    os_family: str
+    os_version: str
+    description: str | None = None
 
 
 class ProxmoxNodeSummary(BaseModel):

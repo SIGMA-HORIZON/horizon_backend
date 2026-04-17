@@ -136,6 +136,16 @@ class ProxmoxClient:
             logger.exception("get_vm_current_status")
             raise ProxmoxIntegrationError(str(e), 502) from e
 
+    def list_isos_on_storage(self, node: str, storage: str = "local") -> list[dict[str, Any]]:
+        """Liste les fichiers ISO présents sur un stockage spécifique d'un nœud."""
+        try:
+            content = self._nodes(node).storage(storage).content.get()
+            return [item for item in content if item['content'] == 'iso']
+        except Exception as e:
+            logger.error(f"Erreur lors de la récupération des ISOs sur {node}/{storage}: {e}")
+            return []
+
+
     def get_cluster_status(self) -> dict[str, Any]:
         """Récupère un résumé global du datacenter Proxmox."""
         if not self._api:

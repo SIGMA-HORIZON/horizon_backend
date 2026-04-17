@@ -251,3 +251,20 @@ def patch_iso_template(
 )
 def admin_proxmox_summary(admin: AdminUser):
     return admin_service.get_proxmox_summary()
+
+
+@router.get("/isos", response_model=schemas.ISOImageListResponse, summary="[Admin] Liste toutes les images ISO")
+def admin_list_isos(admin: AdminUser, db: Session = Depends(get_db)):
+    return admin_service.list_iso_images(db)
+
+
+@router.post("/isos", response_model=schemas.ISOImageResponse, status_code=201, summary="[Admin] Ajouter une image ISO")
+def admin_create_iso(body: schemas.ISOImageCreate, admin: AdminUser, db: Session = Depends(get_db)):
+    return admin_service.create_iso_image(db, body)
+
+
+@router.get("/proxmox/storage-isos", summary="[Admin] Lister les fichiers ISO physiques sur Proxmox")
+def admin_list_proxmox_isos(admin: AdminUser, node: str = "pve", storage: str = "local"):
+    from horizon.infrastructure.proxmox_client import ProxmoxClient
+    client = ProxmoxClient()
+    return client.list_isos_on_storage(node, storage)
