@@ -1,99 +1,87 @@
 "use client";
-import React from 'react';
+import React, { useEffect, useState } from 'react';
+import { adminService } from '../../../services/admin';
 
 export default function Reservations() {
+  const [reservations, setReservations] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const fetchReservations = async () => {
+      try {
+        const data = await adminService.listReservations();
+        setReservations(data.items || []);
+      } catch (err) {
+        console.error("Erreur lors de la récupération des réservations:", err);
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchReservations();
+  }, []);
+
   return (
     <div className="page active" style={{ padding: '0 20px 40px' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '32px' }}>
         <div>
-          <h1 style={{ fontSize: '24px', fontWeight: 700, color: 'var(--g1-text)', marginBottom: '4px', letterSpacing: '-0.5px' }}>Demandes de réservation</h1>
-          <p style={{ color: 'var(--g1-muted)', fontSize: '14px' }}>Valider ou rejeter les allocations de ressources pour les utilisateurs.</p>
-        </div>
-        <div style={{ display: 'flex', padding: '4px', background: 'rgba(255,255,255,0.05)', borderRadius: '8px', border: '1px solid var(--g1-border)' }}>
-          <button style={{ background: 'var(--g1-accent2)', color: '#fff', border: 'none', padding: '8px 16px', borderRadius: '6px', fontSize: '13px', fontWeight: 500, cursor: 'pointer' }}>En attente</button>
-          <button style={{ background: 'transparent', color: 'var(--g1-muted)', border: 'none', padding: '8px 16px', borderRadius: '6px', fontSize: '13px', fontWeight: 500, cursor: 'pointer' }}>Toutes</button>
-          <button style={{ background: 'transparent', color: 'var(--g1-muted)', border: 'none', padding: '8px 16px', borderRadius: '6px', fontSize: '13px', fontWeight: 500, cursor: 'pointer' }}>Résolues</button>
+          <h1 style={{ fontSize: '24px', fontWeight: 700, color: 'var(--g1-text)', marginBottom: '4px', letterSpacing: '-0.5px' }}>Journal des réservations</h1>
+          <p style={{ color: 'var(--g1-muted)', fontSize: '14px' }}>Historique et état actuel des sessions de machines virtuelles.</p>
         </div>
       </div>
 
       <div className="pm-card">
         <div className="pm-hdr">
-          <svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>
-          Dossiers en attente d'approbation
+          <svg viewBox="0 0 24 24" width="18" height="18" stroke="currentColor" fill="none" strokeWidth="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" /><polyline points="14 2 14 8 20 8" /><line x1="16" y1="13" x2="8" y2="13" /><line x1="16" y1="17" x2="8" y2="17" /><polyline points="10 9 9 9 8 9" /></svg>
+          Liste des sessions
         </div>
         <div style={{ overflowX: 'auto' }}>
           <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px' }}>
             <thead style={{ background: 'rgba(255,255,255,0.02)' }}>
               <tr>
-                <th style={{ padding: '16px 20px', textAlign: 'left', color: 'var(--g1-muted)', fontWeight: 600, borderBottom: '1px solid var(--g1-border)' }}>Utilisateur & ID</th>
+                <th style={{ padding: '16px 20px', textAlign: 'left', color: 'var(--g1-muted)', fontWeight: 600, borderBottom: '1px solid var(--g1-border)' }}>Utilisateur & VM</th>
                 <th style={{ padding: '16px 20px', textAlign: 'left', color: 'var(--g1-muted)', fontWeight: 600, borderBottom: '1px solid var(--g1-border)' }}>OS / Image</th>
                 <th style={{ padding: '16px 20px', textAlign: 'left', color: 'var(--g1-muted)', fontWeight: 600, borderBottom: '1px solid var(--g1-border)' }}>Ressources</th>
-                <th style={{ padding: '16px 20px', textAlign: 'left', color: 'var(--g1-muted)', fontWeight: 600, borderBottom: '1px solid var(--g1-border)' }}>Durée & Demande</th>
+                <th style={{ padding: '16px 20px', textAlign: 'left', color: 'var(--g1-muted)', fontWeight: 600, borderBottom: '1px solid var(--g1-border)' }}>Durée & Création</th>
                 <th style={{ padding: '16px 20px', textAlign: 'left', color: 'var(--g1-muted)', fontWeight: 600, borderBottom: '1px solid var(--g1-border)' }}>Statut</th>
                 <th style={{ padding: '16px 20px', textAlign: 'right', color: 'var(--g1-muted)', fontWeight: 600, borderBottom: '1px solid var(--g1-border)' }}>Actions</th>
               </tr>
             </thead>
             <tbody>
-              {/* Reservation 1 */}
-              <tr>
-                <td style={{ padding: '16px 20px', borderBottom: '1px solid rgba(255,255,255,0.03)' }}>
-                  <div style={{ fontWeight: 600, color: 'var(--g1-text)' }}>Ornella Mbo'o</div>
-                  <div style={{ fontSize: '12px', color: 'var(--g1-muted)' }}>vm-gpu-ornella-03</div>
-                </td>
-                <td style={{ padding: '16px 20px', borderBottom: '1px solid rgba(255,255,255,0.03)' }}>
-                  <span className="badge badge-blue">Ubuntu 22.04</span>
-                </td>
-                <td style={{ padding: '16px 20px', borderBottom: '1px solid rgba(255,255,255,0.03)' }}>
-                  <div style={{ color: 'var(--g1-text)' }}>16 vCPU · 64 Go</div>
-                  <div style={{ fontSize: '12px', color: 'var(--g1-muted)' }}>2 GPU · 200 Go SSD</div>
-                </td>
-                <td style={{ padding: '16px 20px', borderBottom: '1px solid rgba(255,255,255,0.03)' }}>
-                  <div style={{ color: 'var(--g1-text)' }}>120 heures</div>
-                  <div style={{ fontSize: '12px', color: 'var(--g1-muted)' }}>Demandé le 27/03/2026</div>
-                </td>
-                <td style={{ padding: '16px 20px', borderBottom: '1px solid rgba(255,255,255,0.03)' }}>
-                  <span className="badge badge-warn">En attente</span>
-                </td>
-                <td style={{ padding: '16px 20px', borderBottom: '1px solid rgba(255,255,255,0.03)', textAlign: 'right' }}>
-                  <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end' }}>
-                    <button className="btn-ghost" style={{ fontSize: '12px', padding: '6px 12px', color: 'var(--g1-on)', borderColor: 'rgba(16,185,129,0.3)' }}>Approuver</button>
-                    <button className="btn-ghost" style={{ fontSize: '12px', padding: '6px 12px', color: 'var(--g1-err)', borderColor: 'rgba(239,68,68,0.3)' }}>Rejeter</button>
-                  </div>
-                </td>
-              </tr>
-
-              {/* Reservation 2 */}
-              <tr>
-                <td style={{ padding: '16px 20px', borderBottom: 'none' }}>
-                  <div style={{ fontWeight: 600, color: 'var(--g1-text)' }}>Jean Dupont</div>
-                  <div style={{ fontSize: '12px', color: 'var(--g1-muted)' }}>vm-dev-dupont-02</div>
-                </td>
-                <td style={{ padding: '16px 20px', borderBottom: 'none' }}>
-                  <span className="badge badge-blue">Debian 12</span>
-                </td>
-                <td style={{ padding: '16px 20px', borderBottom: 'none' }}>
-                  <div style={{ color: 'var(--g1-text)' }}>4 vCPU · 8 Go</div>
-                  <div style={{ fontSize: '12px', color: 'var(--g1-muted)' }}>0 GPU · 50 Go SSD</div>
-                </td>
-                <td style={{ padding: '16px 20px', borderBottom: 'none' }}>
-                  <div style={{ color: 'var(--g1-text)' }}>48 heures</div>
-                  <div style={{ fontSize: '12px', color: 'var(--g1-muted)' }}>Demandé le 27/03/2026</div>
-                </td>
-                <td style={{ padding: '16px 20px', borderBottom: 'none' }}>
-                  <span className="badge badge-warn">En attente</span>
-                </td>
-                <td style={{ padding: '16px 20px', borderBottom: 'none', textAlign: 'right' }}>
-                  <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end' }}>
-                    <button className="btn-ghost" style={{ fontSize: '12px', padding: '6px 12px', color: 'var(--g1-on)', borderColor: 'rgba(16,185,129,0.3)' }}>Approuver</button>
-                    <button className="btn-ghost" style={{ fontSize: '12px', padding: '6px 12px', color: 'var(--g1-err)', borderColor: 'rgba(239,68,68,0.3)' }}>Rejeter</button>
-                  </div>
-                </td>
-              </tr>
+              {loading ? (
+                <tr><td colSpan={6} style={{ padding: '40px', textAlign: 'center', color: 'var(--g1-muted)' }}>Chargement...</td></tr>
+              ) : reservations.length === 0 ? (
+                <tr><td colSpan={6} style={{ padding: '40px', textAlign: 'center', color: 'var(--g1-muted)' }}>Aucune réservation trouvée.</td></tr>
+              ) : (
+                reservations.map((res: any) => (
+                  <tr key={res.id}>
+                    <td style={{ padding: '16px 20px', borderBottom: '1px solid rgba(255,255,255,0.03)' }}>
+                      <div style={{ fontWeight: 600, color: 'var(--g1-text)' }}>{res.user_full_name}</div>
+                      <div style={{ fontSize: '11px', color: 'var(--g1-muted)' }}>{res.vm_name}</div>
+                    </td>
+                    <td style={{ padding: '16px 20px', borderBottom: '1px solid rgba(255,255,255,0.03)' }}>
+                      <span className="badge badge-blue" style={{ background: 'rgba(59,130,246,0.1)', color: '#60A5FA', border: '1px solid rgba(59,130,246,0.2)' }}>{res.os_name}</span>
+                    </td>
+                    <td style={{ padding: '16px 20px', borderBottom: '1px solid rgba(255,255,255,0.03)' }}>
+                      <div style={{ color: 'var(--g1-text)' }}>{res.vcpu} vCPU · {res.ram_gb} Go</div>
+                      <div style={{ fontSize: '11px', color: 'var(--g1-muted)' }}>{res.storage_gb} Go SSD</div>
+                    </td>
+                    <td style={{ padding: '16px 20px', borderBottom: '1px solid rgba(255,255,255,0.03)' }}>
+                      <div style={{ color: 'var(--g1-text)' }}>{res.duration_hours} heures</div>
+                      <div style={{ fontSize: '11px', color: 'var(--g1-muted)' }}>Le {new Date(res.created_at).toLocaleDateString()}</div>
+                    </td>
+                    <td style={{ padding: '16px 20px', borderBottom: '1px solid rgba(255,255,255,0.03)' }}>
+                      <span className={`badge ${res.status === 'ACTIVE' ? 'badge-on' : 'badge-err'}`}>{res.status}</span>
+                    </td>
+                    <td style={{ padding: '16px 20px', borderBottom: '1px solid rgba(255,255,255,0.03)', textAlign: 'right' }}>
+                      <button className="btn-ghost" style={{ fontSize: '11px', padding: '4px 10px' }}>Détails</button>
+                    </td>
+                  </tr>
+                ))
+              )}
             </tbody>
           </table>
         </div>
       </div>
-
     </div>
   )
 }

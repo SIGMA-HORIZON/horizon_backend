@@ -39,5 +39,10 @@ export const vmService = {
     async updateVm(id, data) {
         const response = await api.patch(`/vms/${id}`, data);
         return response.data;
+    },
+
+    async listIsos() {
+        const response = await api.get('/vms/available-isos');
+        return response.data;
     }
 };

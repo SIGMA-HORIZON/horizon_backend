@@ -132,5 +132,9 @@ export const adminService = {
     async getProxmoxStorageIsos() {
         const response = await api.get('/admin/proxmox/storage-isos');
         return response.data;
+    },
+    async listReservations() {
+        const response = await api.get('/admin/reservations');
+        return response.data;
     }
 };

@@ -30,37 +30,34 @@ export default function MesVMs() {
             {vms.map(vm => (
               <tr key={vm.id} onClick={() => router.push(`/dashboard/mes-vms/${vm.id}`)} style={{ cursor: 'pointer' }}>
                 <td style={{ padding: '10px 16px' }}>
-                  <div style={{ fontWeight: 600, fontSize: '12px' }}>{vm.name}</div>
-                  <div style={{ fontSize: '10px', color: 'var(--text-muted)' }}>VMID {vm.id}</div>
+                  <div style={{ fontWeight: 600, fontSize: '13px', color: 'var(--g1-text)' }}>{vm.name}</div>
+                  <div style={{ fontSize: '10px', color: 'var(--g1-muted)' }}>{vm.id.slice(0, 8)}...</div>
                 </td>
                 <td>
-                  <span className={`badge badge-${vm.status === 'running' ? 'on' : (vm.status === 'stopped' ? 'off' : 'warn')}`}>
-                    {vm.status === 'running' ? '● ' : '○ '}
+                  <span className={`badge ${['ACTIVE', 'running', 'on'].includes(vm.status) ? 'badge-on' : (['STOPPED', 'off'].includes(vm.status) ? 'badge-off' : 'badge-warn')}`}>
+                    {['ACTIVE', 'running', 'on'].includes(vm.status) ? '● ' : '○ '}
                     {vm.status.toUpperCase()}
                   </span>
                 </td>
                 <td><span className="badge badge-blue">LINUX</span></td>
                 <td>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '5px', fontSize: '12px' }}>
-                    {vm.cpu_usage || 0}%
-                    <div className="mini-bar">
-                      <div className={`mini-fill ${(vm.cpu_usage || 0) > 80 ? 'mini-fill-err' : ((vm.cpu_usage || 0) > 50 ? 'mini-fill-warn' : '')}`} style={{ width: `${vm.cpu_usage || 0}%` }}></div>
-                    </div>
+                    {vm.vcpu} vCPU
                   </div>
                 </td>
-                <td style={{ fontSize: '12px' }}>{(((vm.ram_usage || 0) / 100) * vm.ram_gb).toFixed(1)} / {vm.ram_gb} Go</td>
-                <td style={{ fontSize: '11px', fontFamily: 'monospace', color: 'var(--text-muted)' }}>{vm.ip_address || 'En attente...'}</td>
+                <td style={{ fontSize: '12px' }}>{vm.ram_gb} Go</td>
+                <td style={{ fontSize: '11px', fontFamily: 'monospace', color: 'var(--g1-muted)' }}>{vm.ip_address || 'Allocation...'}</td>
                 <td>
-                  <div style={{ display: 'flex', gap: '6px' }} onClick={e => e.stopPropagation()}>
-                    <button className="btn-vm btn-vm-console" style={{ fontSize: '10px', padding: '4px 10px' }}>Console</button>
-                    <button
-                      className="btn-vm"
-                      style={{ fontSize: '10px', padding: '4px 10px', color: 'var(--cyan)', borderColor: 'rgba(0,180,216,0.2)', background: 'rgba(0,180,216,0.02)' }}
-                      onClick={() => router.push(`/dashboard/mes-vms/${vm.id}`)}
-                    >
+                  <div style={{ display: 'flex', gap: '8px' }} onClick={e => e.stopPropagation()}>
+                    <button className="btn-vm" style={{ padding: '6px 10px', fontSize: '11px' }} onClick={() => router.push(`/dashboard/mes-vms/${vm.id}`)}>
+                      <svg viewBox="0 0 24 24" width="14" height="14" stroke="currentColor" fill="none" strokeWidth="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" /><circle cx="12" cy="12" r="3" /></svg>
                       Détails
                     </button>
-                    <button className="btn-vm btn-vm-stop" style={{ fontSize: '10px', padding: '4px 10px' }}>Stop</button>
+                    {['ACTIVE', 'running', 'on'].includes(vm.status) ? (
+                      <button className="btn-vm btn-vm-stop" style={{ padding: '6px 10px', fontSize: '11px' }}>Arrêter</button>
+                    ) : (
+                      <button className="btn-vm btn-vm-start" style={{ padding: '6px 10px', fontSize: '11px' }}>Démarrer</button>
+                    )}
                   </div>
                 </td>
               </tr>

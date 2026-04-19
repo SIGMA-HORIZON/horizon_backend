@@ -1,7 +1,8 @@
 "use client";
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useVMs } from './VMContext';
+import { vmService } from '../../services/vms';
 
 interface CreateVMModalProps {
   isOpen: boolean;
@@ -12,13 +13,31 @@ export default function CreateVMModal({ isOpen, onClose }: CreateVMModalProps) {
   const { addVM } = useVMs();
   const router = useRouter();
 
+  const [availableIsos, setAvailableIsos] = useState<any[]>([]);
   const [name, setName] = useState('');
-  const [os, setOs] = useState('Ubuntu Server 22.04 LTS');
+  const [os, setOs] = useState('');
   const [cpu, setCpu] = useState(4);
   const [ram, setRam] = useState(8);
   const [storage, setStorage] = useState(100);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
+
+  useEffect(() => {
+    if (isOpen) {
+      const fetchIsos = async () => {
+        try {
+          const data = await vmService.listIsos();
+          setAvailableIsos(data.items || []);
+          if (data.items?.length > 0) {
+            setOs(data.items[0].name);
+          }
+        } catch (err) {
+          console.error("Failed to fetch available ISOs:", err);
+        }
+      };
+      fetchIsos();
+    }
+  }, [isOpen]);
 
   if (!isOpen) return null;
 
@@ -38,7 +57,7 @@ export default function CreateVMModal({ isOpen, onClose }: CreateVMModalProps) {
 
       // Reset form
       setName('');
-      setOs('Ubuntu Server 22.04 LTS');
+      if (availableIsos.length > 0) setOs(availableIsos[0].name);
       setCpu(4);
       setRam(8);
       setStorage(100);
@@ -85,9 +104,13 @@ export default function CreateVMModal({ isOpen, onClose }: CreateVMModalProps) {
 
           <div className="form-group" style={formGroupStyle}>
             <select style={inputStyle} value={os} onChange={e => setOs(e.target.value)} disabled={isLoading}>
-              <option>Ubuntu Server 22.04 LTS</option>
-              <option>Debian 12</option>
-              <option>Fedora 39</option>
+              {availableIsos.length > 0 ? (
+                availableIsos.map(iso => (
+                  <option key={iso.id} value={iso.name}>{iso.name}</option>
+                ))
+              ) : (
+                <option disabled>Aucune image disponible</option>
+              )}
             </select>
           </div>
 
