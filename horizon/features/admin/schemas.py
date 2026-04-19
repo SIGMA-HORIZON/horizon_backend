@@ -1,4 +1,4 @@
-"""Schémas Pydantic — administration."""
+"""Schémas Pydantic - administration."""
 
 from datetime import datetime
 from typing import Any
@@ -159,6 +159,7 @@ class IsoProxmoxTemplateResponse(BaseModel):
 
     id: UUID
     iso_image_id: UUID
+    iso_name: str | None = None
     proxmox_template_vmid: int
 
 
@@ -173,3 +174,57 @@ class IsoProxmoxTemplateCreate(BaseModel):
 
 class IsoProxmoxTemplatePatch(BaseModel):
     proxmox_template_vmid: int = Field(..., ge=1)
+
+
+class ISOImageResponse(BaseModel):
+    model_config = {"from_attributes": True}
+    id: UUID
+    name: str
+    filename: str
+    os_family: str
+    os_version: str
+    description: str | None
+    is_active: bool
+    created_at: datetime
+
+
+class ISOImageListResponse(BaseModel):
+    items: list[ISOImageResponse]
+
+
+class ISOImageCreate(BaseModel):
+    name: str
+    filename: str
+    os_family: str
+    os_version: str
+    description: str | None = None
+
+
+class ProxmoxNodeSummary(BaseModel):
+    name: str
+    status: str
+    cpu: float
+    memory: dict[str, Any]
+    vms_count: int
+
+
+class ProxmoxSummaryResponse(BaseModel):
+    nodes: list[ProxmoxNodeSummary]
+    total_vms: int
+    active_vms: int
+    total_cpus: int
+    used_cpus: int
+    total_memory: int
+    used_memory: int
+
+
+class PrepareTemplateRequest(BaseModel):
+    vmid: int = Field(..., ge=100)
+    node: str
+    storage: str = "local"
+    iso_storage: str | None = Field(default=None, description="Stockage où se trouve l'ISO (si différent du stockage disque)")
+    iso_filename: str
+    name: str = "template-prepare"
+    vcpu: int = 2
+    ram_mb: int = 2048
+    storage_gb: int = 20

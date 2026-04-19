@@ -1,4 +1,4 @@
-"""Schémas Pydantic — comptes."""
+"""Schémas Pydantic - comptes."""
 
 from datetime import datetime
 from uuid import UUID

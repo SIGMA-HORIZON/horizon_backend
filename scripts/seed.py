@@ -1,5 +1,5 @@
 """
-Horizon — Seed Dataset
+Horizon - Seed Dataset
 Données de test : 3 admins, 10 users, 15 VMs, 8 ISO, logs, incidents, violations
 Exécution : python seed.py
 """
@@ -135,7 +135,7 @@ def seed():
         print("  -> Admin accounts (3)...")
         admin1 = User(
             id=uuid.uuid4(), username="admin.tamegue",
-            email="tamegue@enspy.cm",
+            email="tameguedonald@gmail.com",
             hashed_password=hash_pwd("Admin@Horizon2025!"),
             first_name="Donald", last_name="TAMEGUE NEGOU",
             organisation="ENSPY / SIGMA",
@@ -157,7 +157,7 @@ def seed():
         )
         admin3 = User(
             id=uuid.uuid4(), username="admin.demanou",
-            email="demanou@enspy.cm",
+            email="billnelson113@gmail.com",
             hashed_password=hash_pwd("Admin@Horizon2025!"),
             first_name="Bill Nelson", last_name="DEMANOU",
             organisation="ENSPY / SIGMA",
@@ -200,7 +200,7 @@ def seed():
             u = User(
                 id=uuid.uuid4(), username=uname, email=email,
                 hashed_password=hash_pwd("Student@2025!"),
-                first_name=fn, last_name=ln, organisation=f"ENSPY — {org}",
+                first_name=fn, last_name=ln, organisation=f"ENSPY - {org}",
                 role=UserRoleEnum.USER, role_id=role_user.id,
                 must_change_pwd=False, is_active=True,
                 quota_policy_id=policy.id,
@@ -208,13 +208,13 @@ def seed():
             )
             all_users.append(u)
 
-        # User inactif depuis 95 jours — doit être suspendu (POL-ACCOUNT-03)
+        # User inactif depuis 95 jours - doit être suspendu (POL-ACCOUNT-03)
         inactive_user = User(
             id=uuid.uuid4(), username="kevin.inactive",
             email="kevin.inactive@enspy.cm",
             hashed_password=hash_pwd("Student@2025!"),
             first_name="Kevin", last_name="INACTIF",
-            organisation="ENSPY — INFO2",
+            organisation="ENSPY - INFO2",
             role=UserRoleEnum.USER, role_id=role_user.id,
             must_change_pwd=False, is_active=False,
             quota_policy_id=qp_student.id,
@@ -224,12 +224,12 @@ def seed():
         session.add_all(all_users)
         session.flush()
 
-        # Override individuel pour alice — plus de RAM autorisée
+        # Override individuel pour alice - plus de RAM autorisée
         override_alice = QuotaOverride(
             id=uuid.uuid4(), user_id=all_users[0].id,
             max_ram_gb_per_vm=8.0, max_session_duration_hours=24,
             granted_by_id=admin2.id,
-            reason="Projet ML intensif — validation superviseur",
+            reason="Projet ML intensif - validation superviseur",
         )
         session.add(override_alice)
         session.flush()
@@ -238,21 +238,21 @@ def seed():
         print("  -> ISO images (8)...")
         iso_data = [
             ("Ubuntu 22.04 LTS",    "ubuntu-22.04-live-server-amd64.iso",
-             OSFamily.LINUX,   "22.04 LTS",     "Serveur Ubuntu LTS — recommandé"),
+             OSFamily.LINUX,   "22.04 LTS",     "Serveur Ubuntu LTS - recommandé"),
             ("Ubuntu 20.04 LTS",    "ubuntu-20.04.6-live-server-amd64.iso",
-             OSFamily.LINUX,  "20.04 LTS",     "Serveur Ubuntu LTS — support étendu"),
+             OSFamily.LINUX,  "20.04 LTS",     "Serveur Ubuntu LTS - support étendu"),
             ("Debian 12 Bookworm",  "debian-12.4.0-amd64-netinst.iso",
              OSFamily.LINUX,   "12 Bookworm",   "Debian stable minimaliste"),
             ("CentOS Stream 9",     "CentOS-Stream-9-latest-x86_64.iso",
              OSFamily.LINUX,   "Stream 9",      "CentOS pour environnements serveur"),
             ("Fedora 39 Server",    "Fedora-Server-dvd-x86_64-39.iso",
-             OSFamily.LINUX,   "39",            "Fedora Server — technologies récentes"),
+             OSFamily.LINUX,   "39",            "Fedora Server - technologies récentes"),
             ("Kali Linux 2024.1",   "kali-linux-2024.1-installer-amd64.iso", OSFamily.LINUX,
-             "2024.1",        "Kali — sécurité et pentest (usage pédagogique)"),
+             "2024.1",        "Kali - sécurité et pentest (usage pédagogique)"),
             ("Windows Server 2022", "WinServer2022_x64.iso",
              OSFamily.WINDOWS, "Server 2022",   "Windows Server pour TP systèmes"),
             ("Windows 11 Pro",      "Win11_23H2_x64.iso",
-             OSFamily.WINDOWS, "11 23H2",       "Windows 11 — TP applications bureau"),
+             OSFamily.WINDOWS, "11 23H2",       "Windows 11 - TP applications bureau"),
         ]
 
         isos = []
@@ -420,7 +420,7 @@ def seed():
             id=uuid.uuid4(), vm_id=vms[10].id, user_id=all_users[7].id,
             incident_type=IncidentType.EXPLOIT_TOOL_DETECTED,
             severity=IncidentSeverity.MEDIUM, status=IncidentStatus.INVESTIGATING,
-            description="Outil de fuzzing détecté en exécution sur herve-security-lab — usage pédagogique non déclaré.",
+            description="Outil de fuzzing détecté en exécution sur herve-security-lab - usage pédagogique non déclaré.",
             created_at=now - timedelta(hours=6),
         )
         inc3 = SecurityIncident(
@@ -470,14 +470,14 @@ def seed():
         print("  -> Account requests...")
         req1 = AccountRequest(
             id=uuid.uuid4(), first_name="Mireille", last_name="TSIMI",
-            email="mireille.tsimi@enspy.cm", organisation="ENSPY — INFO1",
-            justification="Projet de fin d'année — simulation réseau",
+            email="mireille.tsimi@enspy.cm", organisation="ENSPY - INFO1",
+            justification="Projet de fin d'année - simulation réseau",
             status=AccountRequestStatus.PENDING,
         )
         req2 = AccountRequest(
             id=uuid.uuid4(), first_name="Patrick", last_name="NOAH",
-            email="patrick.noah@enspy.cm", organisation="ENSPY — INFO3",
-            justification="TP systèmes d'exploitation — virtualisation",
+            email="patrick.noah@enspy.cm", organisation="ENSPY - INFO3",
+            justification="TP systèmes d'exploitation - virtualisation",
             status=AccountRequestStatus.APPROVED,
             reviewed_by_id=admin2.id,
             reviewed_at=(now - timedelta(days=5)).isoformat(),

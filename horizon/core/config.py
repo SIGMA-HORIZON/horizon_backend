@@ -1,5 +1,5 @@
 """
-Horizon — Configuration (Pydantic v2 BaseSettings)
+Horizon - Configuration (Pydantic v2 BaseSettings)
 Politiques POL-SIGMA-HORIZON-v1.0
 """
 
@@ -20,7 +20,7 @@ class Settings(BaseSettings):
     JWT_ACCESS_TOKEN_EXPIRE_MINUTES: int = 60
 
     DATABASE_URL: str = (
-        "postgresql+psycopg2://horizon_user:horizon_pass@localhost:5432/horizon_db"
+        "postgresql+psycopg2://horizon:horizon@localhost:5432/horizon"
     )
     REDIS_URL: str = "redis://localhost:6379/0"
 
@@ -69,15 +69,17 @@ class Settings(BaseSettings):
     HARD_LIMIT_SESSION_HOURS: int = 72
     HARD_LIMIT_SHARED_SPACE_GB: float = 20.0
 
-    # Proxmox — désactivé par défaut (aucun appel API, comportement métier inchangé)
+    # Proxmox - Integrated Configuration
     PROXMOX_ENABLED: bool = False
     PROXMOX_HOST: str = ""
+    PROXMOX_PORT: int = 8006
     PROXMOX_USER: str = ""
-    PROXMOX_TOKEN_ID: str = ""
-    PROXMOX_TOKEN_SECRET: str = ""
+    PROXMOX_TOKEN_NAME: str = ""
+    PROXMOX_TOKEN_VALUE: str = ""
     PROXMOX_VERIFY_SSL: bool = False
-    PROXMOX_DEFAULT_NODE: str = ""
+    PROXMOX_NODE: str = ""
     PROXMOX_NET0_TEMPLATE: str = "virtio,bridge=vmbr0"
+    PROXMOX_VLAN_ISOLATION: bool = True
 
 
 @lru_cache

@@ -1,4 +1,4 @@
-"""Dépendances FastAPI — auth et rôles."""
+"""Dépendances FastAPI - auth et rôles."""
 
 from typing import Annotated
 

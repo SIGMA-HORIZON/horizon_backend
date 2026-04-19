@@ -1,5 +1,5 @@
 """
-Horizon API — point d'entrée FastAPI
+Horizon API - point d'entrée FastAPI
 POL-SIGMA-HORIZON-v1.0
 """
 
@@ -23,24 +23,24 @@ settings = get_settings()
 
 logging.basicConfig(
     level=logging.DEBUG if settings.APP_DEBUG else logging.INFO,
-    format="%(asctime)s [%(levelname)s] %(name)s — %(message)s",
+    format="%(asctime)s [%(levelname)s] %(name)s - %(message)s",
 )
 logger = logging.getLogger("horizon.main")
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    logger.info("Horizon API — Démarrage...")
+    logger.info("Horizon API - Démarrage...")
     start_scheduler()
     yield
-    logger.info("Horizon API — Arrêt...")
+    logger.info("Horizon API - Arrêt...")
     stop_scheduler()
 
 
 app = FastAPI(
     title="Horizon API",
     description=(
-        "API de gestion de machines virtuelles — Projet SIGMA / ENSPY\n\n"
+        "API de gestion de machines virtuelles - Projet SIGMA / ENSPY\n\n"
         "Politique de référence : **POL-SIGMA-HORIZON-v1.0**\n\n"
         "Préfixe des routes métier : **`/api/v1`**"
     ),
@@ -54,7 +54,7 @@ app.add_middleware(HTTPSEnforcementMiddleware)
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3000", "https://horizon.enspy.cm"],
+    allow_origins=["http://localhost:3010", "https://horizon.enspy.cm"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -68,9 +68,42 @@ api_v1.include_router(admin_router)
 app.include_router(api_v1)
 
 
+from horizon.shared.policies.enforcer import PolicyError
+
+@app.exception_handler(PolicyError)
+async def policy_exception_handler(request: Request, exc: PolicyError):
+    with open('/tmp/horizon_debug.log', 'a') as f:
+        f.write(f"PolicyError: {exc.detail}\n")
+    return JSONResponse(
+        status_code=exc.status_code,
+        content={"detail": exc.detail},
+    )
+
+from fastapi.exceptions import RequestValidationError
+
+@app.exception_handler(RequestValidationError)
+async def validation_exception_handler(request: Request, exc: RequestValidationError):
+    # Correction : Pydantic v2 peut inclure des objets Exception dans 'ctx', non sérialisables par défaut.
+    errors = exc.errors()
+    for error in errors:
+        if "ctx" in error:
+            for k, v in error["ctx"].items():
+                if isinstance(v, Exception):
+                    error["ctx"][k] = str(v)
+    
+    with open('/tmp/horizon_debug.log', 'a') as f:
+        f.write(f"ValidationError: {errors}\n")
+    return JSONResponse(
+        status_code=422,
+        content={"detail": errors}
+    )
+
 @app.exception_handler(Exception)
 async def global_exception_handler(request: Request, exc: Exception):
     logger.error("Erreur non gérée : %s", exc, exc_info=True)
+    import traceback
+    with open('/tmp/horizon_debug.log', 'a') as f:
+        f.write(f"Exception: {traceback.format_exc()}\n")
     return JSONResponse(
         status_code=500,
         content={"detail": "Erreur interne du serveur. Contactez l'équipe SIGMA."},
@@ -91,5 +124,5 @@ def health_check():
 @app.get("/", tags=["Système"], include_in_schema=False)
 def root():
     return {
-        "message": "Horizon API — SIGMA / ENSPY. Documentation : /docs — API métier : /api/v1"
+        "message": "Horizon API - SIGMA / ENSPY. Documentation : /docs - API métier : /api/v1"
     }

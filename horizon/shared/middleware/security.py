@@ -1,4 +1,4 @@
-"""POL-SEC-02 — HTTPS optionnel en production."""
+"""POL-SEC-02 - HTTPS optionnel en production."""
 
 from fastapi import Request
 from fastapi.responses import JSONResponse

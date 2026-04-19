@@ -1,4 +1,4 @@
-"""Schémas Pydantic — VMs utilisateur."""
+"""Schémas Pydantic - VMs utilisateur."""
 
 from datetime import datetime
 from uuid import UUID
@@ -8,12 +8,16 @@ from pydantic import BaseModel, Field, field_validator
 
 class VMCreateRequest(BaseModel):
     name: str
-    iso_image_id: str
-    vcpu: int
-    ram_gb: float
-    storage_gb: float
-    session_hours: int
+    iso_image_id: str = Field(..., alias="os")
+    vcpu: int = Field(..., alias="cpu")
+    ram_gb: float = Field(..., alias="ram")
+    storage_gb: float = Field(..., alias="storage")
+    session_hours: int = 2  # Par défaut 2 heures si non précisé par le frontend
     description: str | None = None
+
+    model_config = {
+        "populate_by_name": True,  # Permet d'utiliser soit le nom réel soit l'alias
+    }
 
     @field_validator("vcpu")
     @classmethod

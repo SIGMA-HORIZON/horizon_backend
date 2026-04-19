@@ -1,4 +1,4 @@
-"""Schémas Pydantic — auth."""
+"""Schémas Pydantic - auth."""
 
 import re
 from datetime import datetime

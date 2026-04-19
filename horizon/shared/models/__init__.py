@@ -1,4 +1,4 @@
-"""Modèles SQLAlchemy — import groupé pour Alembic et l'application."""
+"""Modèles SQLAlchemy - import groupé pour Alembic et l'application."""
 
 from horizon.shared.models.base import Base, TimestampMixin
 from horizon.shared.models.role import Role, RolePermission, UserRoleEnum

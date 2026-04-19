@@ -1,6 +1,7 @@
 """Logique métier réservée aux administrateurs."""
 
 import uuid
+from typing import Any
 
 from sqlalchemy.orm import Session
 
@@ -9,6 +10,7 @@ from horizon.features.admin import schemas
 from horizon.features.vms import service as vm_service
 from horizon.features.vms.service import _resolve_proxmox_node_name
 from horizon.shared.models import (
+    ISOImage,
     IsoProxmoxTemplate,
     ProxmoxNodeMapping,
     QuotaOverride,
@@ -197,10 +199,12 @@ def patch_proxmox_node_mapping(
 
 def list_iso_proxmox_templates(db: Session) -> schemas.IsoProxmoxTemplateListResponse:
     rows = db.query(IsoProxmoxTemplate).all()
-    return schemas.IsoProxmoxTemplateListResponse(
-        items=[schemas.IsoProxmoxTemplateResponse.model_validate(
-            r) for r in rows]
-    )
+    items = []
+    for r in rows:
+        item = schemas.IsoProxmoxTemplateResponse.model_validate(r)
+        item.iso_name = r.iso_image.name if r.iso_image else "Inconnu"
+        items.append(item)
+    return schemas.IsoProxmoxTemplateListResponse(items=items)
 
 
 def create_iso_proxmox_template(
@@ -217,7 +221,9 @@ def create_iso_proxmox_template(
     db.add(row)
     db.commit()
     db.refresh(row)
-    return schemas.IsoProxmoxTemplateResponse.model_validate(row)
+    res = schemas.IsoProxmoxTemplateResponse.model_validate(row)
+    res.iso_name = row.iso_image.name if row.iso_image else "Inconnu"
+    return res
 
 
 def patch_iso_proxmox_template(
@@ -231,4 +237,108 @@ def patch_iso_proxmox_template(
     row.proxmox_template_vmid = body.proxmox_template_vmid
     db.commit()
     db.refresh(row)
-    return schemas.IsoProxmoxTemplateResponse.model_validate(row)
+    res = schemas.IsoProxmoxTemplateResponse.model_validate(row)
+    res.iso_name = row.iso_image.name if row.iso_image else "Inconnu"
+    return res
+
+
+def list_iso_images(db: Session) -> schemas.ISOImageListResponse:
+    rows = db.query(ISOImage).order_by(ISOImage.created_at.desc()).all()
+    return schemas.ISOImageListResponse(
+        items=[schemas.ISOImageResponse.model_validate(r) for r in rows]
+    )
+
+
+def create_iso_image(db: Session, body: schemas.ISOImageCreate) -> schemas.ISOImageResponse:
+    row = ISOImage(
+        id=uuid.uuid4(),
+        **body.model_dump()
+    )
+    db.add(row)
+    db.commit()
+    db.refresh(row)
+    return schemas.ISOImageResponse.model_validate(row)
+
+
+async def get_proxmox_summary() -> schemas.ProxmoxSummaryResponse:
+    from horizon.infrastructure.proxmox_client import (
+        ProxmoxClient,
+        ProxmoxIntegrationError,
+    )
+
+    _require_proxmox_enabled()
+    try:
+        client = ProxmoxClient()
+        data = client.get_cluster_status()
+        return schemas.ProxmoxSummaryResponse(**data)
+    except ProxmoxIntegrationError as e:
+        raise PolicyError("PROXMOX", e.message, e.status_code) from e
+
+
+async def upload_iso_to_proxmox(
+    db: Session,
+    admin_id: uuid.UUID,
+    node: str,
+    storage: str,
+    file_obj,
+    filename: str,
+    name: str | None = None,
+    os_family: str = "LINUX",
+    os_version: str = "Unknown",
+    description: str | None = None,
+) -> dict[str, Any]:
+    from horizon.infrastructure.proxmox_client import (
+        ProxmoxClient,
+        ProxmoxIntegrationError,
+    )
+
+    _require_proxmox_enabled()
+    try:
+        client = ProxmoxClient()
+        # 1. Upload physique vers Proxmox
+        res = await client.upload_iso(node, storage, file_obj, filename)
+
+        # 2. Enregistrement automatique dans la table iso_images
+        new_iso = ISOImage(
+            id=uuid.uuid4(),
+            name=name or filename,
+            filename=filename,
+            os_family=os_family,
+            os_version=os_version,
+            description=description,
+            added_by_id=admin_id,
+            is_active=True
+        )
+        db.add(new_iso)
+        db.commit()
+        db.refresh(new_iso)
+
+        res["iso_id"] = str(new_iso.id)
+        res["database_status"] = "registered"
+        return res
+    except ProxmoxIntegrationError as e:
+        raise PolicyError("PROXMOX", e.message, e.status_code) from e
+
+
+async def prepare_vm_template(db: Session, body: schemas.PrepareTemplateRequest) -> dict[str, Any]:
+    from horizon.infrastructure.proxmox_client import (
+        ProxmoxClient,
+        ProxmoxIntegrationError,
+    )
+
+    _require_proxmox_enabled()
+    try:
+        client = ProxmoxClient()
+        return await client.prepare_vm_for_template(
+            node=body.node,
+            vmid=body.vmid,
+            storage=body.storage,
+            iso_filename=body.iso_filename,
+            name=body.name,
+            vcpu=body.vcpu,
+            ram_mb=body.ram_mb,
+            storage_gb=body.storage_gb,
+            iso_storage=body.iso_storage
+        )
+    except ProxmoxIntegrationError as e:
+        raise PolicyError("PROXMOX", e.message, e.status_code) from e

@@ -1,4 +1,4 @@
-"""Authentification — JWT, bcrypt, lockout."""
+"""Authentification - JWT, bcrypt, lockout."""
 
 import secrets
 import string
@@ -86,7 +86,9 @@ def authenticate_user(db: Session, username: str, password: str, ip_address: str
         401,
     )
 
-    user: Optional[User] = db.query(User).filter(User.username == username).first()
+    user: Optional[User] = db.query(User).filter(
+        (User.username == username) | (User.email == username)
+    ).first()
 
     attempt = LoginAttempt(
         id=uuid.uuid4(),

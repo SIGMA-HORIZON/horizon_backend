@@ -234,13 +234,48 @@ def task_handle_inactive_accounts():
 
 
 def task_monitor_vms():
-    from horizon.shared.models import VirtualMachine, VMStatus
+    from horizon.shared.models import VirtualMachine, VMStatus, ProxmoxNodeMapping
+    from horizon.infrastructure.proxmox_client import ProxmoxClient
 
     db = _get_db()
     try:
+        # On ne synchronise que les VMs actives qui n'ont pas encore d'IP (ou pour mise à jour)
         active_vms = db.query(VirtualMachine).filter(VirtualMachine.status == VMStatus.ACTIVE).all()
+        
+        if not active_vms:
+            return
+
+        client = ProxmoxClient()
+        if not client.enabled:
+            return
+
         for vm in active_vms:
-            logger.debug("[POL-SURV-01] Monitoring VM %s (%s)", vm.id, vm.name)
+            # Résoudre le nom du nœud Proxmox
+            mapping = db.query(ProxmoxNodeMapping).filter(
+                ProxmoxNodeMapping.physical_node == vm.node
+            ).first()
+            px_node = mapping.proxmox_node_name if mapping else vm.node
+            
+            try:
+                # Vérifier si la VM existe encore sur Proxmox
+                status_data = client.get_vm_current_status(px_node, vm.proxmox_vmid)
+                
+                # Récupérer les IPs via l'agent
+                ips = client.get_vm_ips(px_node, vm.proxmox_vmid)
+                if ips:
+                    vm.ip_address = ips[0]
+                    logger.info("[POL-SURV-01] IP synchronisée pour VM %s : %s", vm.id, vm.ip_address)
+                else:
+                    logger.debug("[POL-SURV-01] Pas d'IP détectée pour VM %s (%s)", vm.id, vm.name)
+            except Exception as e:
+                # Si erreur 404 : la VM a disparu de Proxmox
+                if "does not exist" in str(e) or "404" in str(e):
+                    logger.error("[POL-SURV-01] VM %s introuvable sur Proxmox ! Passage en statut STOPPED.", vm.id)
+                    vm.status = VMStatus.STOPPED
+                    vm.stopped_at = datetime.now(timezone.utc)
+                else:
+                    logger.error("[POL-SURV-01] Erreur monitoring VM %s : %s", vm.id, e)
+        
         db.commit()
     except Exception as e:
         logger.error("[task_monitor_vms] Erreur : %s", e)
@@ -303,7 +338,7 @@ def start_scheduler():
         replace_existing=True,
     )
     scheduler.start()
-    logger.info("Horizon Scheduler démarré — toutes les tâches planifiées actives.")
+    logger.info("Horizon Scheduler démarré - toutes les tâches planifiées actives.")
 
 
 def stop_scheduler():

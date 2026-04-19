@@ -2,7 +2,7 @@
 
 import uuid
 
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, Query, UploadFile, File
 from sqlalchemy.orm import Session
 
 from horizon.features.admin import schemas
@@ -27,7 +27,7 @@ router = APIRouter(prefix="/admin", tags=["Administration"])
 @router.get(
     "/vms",
     response_model=schemas.AdminVMListResponse,
-    summary="[Admin] Dashboard global — toutes les VMs",
+    summary="[Admin] Dashboard global - toutes les VMs",
 )
 def admin_list_vms(admin: AdminUser, db: Session = Depends(get_db)):
     return admin_service.build_admin_vm_dashboard(db)
@@ -150,7 +150,7 @@ def get_violations(
 @router.post(
     "/proxmox/vms/{proxmox_vmid}/pause",
     response_model=schemas.ProxmoxOperationResponse,
-    summary="[Admin] Pause Proxmox (suspend) — proxmox_vmid Horizon",
+    summary="[Admin] Pause Proxmox (suspend) - proxmox_vmid Horizon",
 )
 def admin_proxmox_pause(proxmox_vmid: int, admin: AdminUser, db: Session = Depends(get_db)):
     return admin_service.admin_proxmox_pause_by_vmid(db, proxmox_vmid)
@@ -168,7 +168,7 @@ def admin_proxmox_list_qemu(node_name: str, admin: AdminUser, db: Session = Depe
 @router.get(
     "/proxmox/vms/{proxmox_vmid}/status",
     response_model=schemas.ProxmoxVmStatusResponse,
-    summary="[Admin] Statut courant Proxmox (current) — proxmox_vmid Horizon",
+    summary="[Admin] Statut courant Proxmox (current) - proxmox_vmid Horizon",
 )
 def admin_proxmox_status(proxmox_vmid: int, admin: AdminUser, db: Session = Depends(get_db)):
     return admin_service.admin_proxmox_vm_status(db, proxmox_vmid)
@@ -242,3 +242,54 @@ def patch_iso_template(
     db: Session = Depends(get_db),
 ):
     return admin_service.patch_iso_proxmox_template(db, template_id, body)
+
+
+@router.get(
+    "/proxmox/summary",
+    response_model=schemas.ProxmoxSummaryResponse,
+    summary="[Admin] Résumé global du cluster Proxmox (Temps Réel)",
+)
+async def admin_proxmox_summary(admin: AdminUser):
+    return await admin_service.get_proxmox_summary()
+
+
+@router.get("/isos", response_model=schemas.ISOImageListResponse, summary="[Admin] Liste toutes les images ISO")
+def admin_list_isos(admin: AdminUser, db: Session = Depends(get_db)):
+    return admin_service.list_iso_images(db)
+
+
+@router.post("/isos", response_model=schemas.ISOImageResponse, status_code=201, summary="[Admin] Ajouter une image ISO")
+def admin_create_iso(body: schemas.ISOImageCreate, admin: AdminUser, db: Session = Depends(get_db)):
+    return admin_service.create_iso_image(db, body)
+
+
+@router.get("/proxmox/storage-isos", summary="[Admin] Lister les fichiers ISO physiques sur Proxmox")
+def admin_list_proxmox_isos(admin: AdminUser, node: str = "pve", storage: str = "local"):
+    from horizon.infrastructure.proxmox_client import ProxmoxClient
+    client = ProxmoxClient()
+    return client.list_isos_on_storage(node, storage)
+
+
+@router.post("/proxmox/upload-iso", summary="[Admin] Uploader un fichier ISO sur Proxmox")
+async def admin_upload_proxmox_iso(
+    admin: AdminUser,
+    node: str = Query("pve"),
+    storage: str = Query("local"),
+    name: str | None = Query(None),
+    os_family: str = Query("LINUX"),
+    os_version: str = Query("Unknown"),
+    description: str | None = Query(None),
+    file: UploadFile = File(...),
+    db: Session = Depends(get_db),
+):
+    return await admin_service.upload_iso_to_proxmox(
+        db, admin.id, node, storage, file.file, file.filename,
+        name, os_family, os_version, description
+    )
+
+
+@router.post("/proxmox/prepare-template", summary="[Admin] Préparer une VM à partir d'un ISO pour en faire un template")
+async def admin_prepare_template(
+    body: schemas.PrepareTemplateRequest, admin: AdminUser, db: Session = Depends(get_db)
+):
+    return await admin_service.prepare_vm_template(db, body)

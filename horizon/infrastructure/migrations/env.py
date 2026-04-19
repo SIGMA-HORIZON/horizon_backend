@@ -1,4 +1,4 @@
-"""Alembic environment — Horizon."""
+"""Alembic environment - Horizon."""
 
 import os
 import sys
