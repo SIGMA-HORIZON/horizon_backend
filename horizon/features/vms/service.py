@@ -40,8 +40,8 @@ def _resolve_proxmox_node_name(db: Session, physical_node: PhysicalNode) -> str:
     )
     if row:
         return row.proxmox_node_name
-    if s.PROXMOX_DEFAULT_NODE:
-        return s.PROXMOX_DEFAULT_NODE
+    if s.PROXMOX_NODE:
+        return s.PROXMOX_NODE
     raise PolicyError(
         "PROXMOX",
         "Aucun mapping nœud Proxmox pour ce nœud métier (table proxmox_node_mappings).",
@@ -52,12 +52,13 @@ def _resolve_proxmox_node_name(db: Session, physical_node: PhysicalNode) -> str:
 def _build_net0(vlan_id: int | None) -> str:
     s = get_settings()
     base = s.PROXMOX_NET0_TEMPLATE.strip()
-    if vlan_id is not None:
+    # On ajoute le tag VLAN seulement si l'isolation est activée en config
+    if vlan_id is not None and getattr(s, "PROXMOX_VLAN_ISOLATION", True):
         return f"{base},tag={vlan_id}"
     return base
 
 
-def create_vm(db: Session, owner_id, data: dict) -> VirtualMachine:
+async def create_vm(db: Session, owner_id, data: dict) -> VirtualMachine:
     from horizon.infrastructure.proxmox_client import ProxmoxClient, ProxmoxIntegrationError
 
     s = get_settings()
@@ -159,7 +160,7 @@ def create_vm(db: Session, owner_id, data: dict) -> VirtualMachine:
             memory_mb = max(1, int(round(float(data["ram_gb"]) * 1024)))
             net0 = _build_net0(vlan_id)
             try:
-                client.create_vm_from_template(
+                res = await client.create_vm_from_template(
                     px_node,
                     tpl.proxmox_template_vmid,
                     vm.proxmox_vmid,
@@ -169,6 +170,9 @@ def create_vm(db: Session, owner_id, data: dict) -> VirtualMachine:
                     net0,
                     ssh_key=public_key,
                 )
+                # On capture l'IP s'il a été trouvé pendant la création
+                if res.get("ip_address"):
+                    vm.ip_address = res["ip_address"]
             except ProxmoxIntegrationError as e:
                 raise PolicyError("PROXMOX", e.message, e.status_code) from e
 
@@ -199,7 +203,7 @@ def create_vm(db: Session, owner_id, data: dict) -> VirtualMachine:
         raise
 
 
-def stop_vm(db: Session, vm_id, requesting_user_id, user_role: str, force: bool = False) -> None:
+async def stop_vm(db: Session, vm_id, requesting_user_id, user_role: str, force: bool = False) -> None:
     from horizon.infrastructure.proxmox_client import ProxmoxClient, ProxmoxIntegrationError
 
     vm = _get_vm_or_404(db, vm_id)
@@ -219,9 +223,11 @@ def stop_vm(db: Session, vm_id, requesting_user_id, user_role: str, force: bool 
         if client.enabled:
             px_node = _resolve_proxmox_node_name(db, vm.node)
             try:
-                client.stop_vm(px_node, vm.proxmox_vmid)
+                await client.stop_vm(px_node, vm.proxmox_vmid)
             except ProxmoxIntegrationError as e:
-                raise PolicyError("PROXMOX", e.message, e.status_code) from e
+                # Si force, on continue même si Proxmox échoue
+                if not force:
+                    raise PolicyError("PROXMOX", e.message, e.status_code) from e
 
     vm.status = VMStatus.STOPPED
     vm.stopped_at = datetime.now(timezone.utc)
@@ -232,7 +238,7 @@ def stop_vm(db: Session, vm_id, requesting_user_id, user_role: str, force: bool 
     db.commit()
 
 
-def delete_vm(db: Session, vm_id, requesting_user_id, user_role: str) -> None:
+async def delete_vm(db: Session, vm_id, requesting_user_id, user_role: str) -> None:
     from horizon.infrastructure.proxmox_client import ProxmoxClient, ProxmoxIntegrationError
 
     vm = _get_vm_or_404(db, vm_id)
@@ -252,10 +258,10 @@ def delete_vm(db: Session, vm_id, requesting_user_id, user_role: str) -> None:
             try:
                 if vm.status == VMStatus.ACTIVE:
                     try:
-                        client.stop_vm(px_node, vm.proxmox_vmid)
+                        await client.stop_vm(px_node, vm.proxmox_vmid)
                     except ProxmoxIntegrationError:
                         pass
-                client.delete_vm(px_node, vm.proxmox_vmid)
+                await client.delete_vm(px_node, vm.proxmox_vmid)
             except ProxmoxIntegrationError as e:
                 raise PolicyError("PROXMOX", e.message, e.status_code) from e
 
@@ -341,6 +347,28 @@ def extend_vm_lease(
 
 def get_user_vms(db: Session, user_id) -> list[VirtualMachine]:
     return db.query(VirtualMachine).filter(VirtualMachine.owner_id == user_id).all()
+
+
+def refresh_vm_status(db: Session, vm_id: uuid.UUID, user_id: uuid.UUID, user_role: str) -> VirtualMachine:
+    vm = _get_vm_or_404(db, vm_id)
+    enforce_vm_ownership(vm.owner_id, user_id, user_role)
+    
+    from horizon.infrastructure.proxmox_client import ProxmoxClient, ProxmoxIntegrationError
+    
+    try:
+        client = ProxmoxClient()
+        if client.enabled and vm.status == VMStatus.ACTIVE:
+            px_node = _resolve_proxmox_node_name(db, vm.node)
+            ips = client.get_vm_ips(px_node, vm.proxmox_vmid)
+            if ips:
+                vm.ip_address = ips[0]
+                db.commit()
+                db.refresh(vm)
+    except ProxmoxIntegrationError:
+        # On ignore les erreurs Proxmox lors d'un refresh passif
+        pass
+        
+    return vm
 
 
 def get_all_vms_admin(db: Session) -> list[VirtualMachine]:

@@ -216,3 +216,15 @@ class ProxmoxSummaryResponse(BaseModel):
     used_cpus: int
     total_memory: int
     used_memory: int
+
+
+class PrepareTemplateRequest(BaseModel):
+    vmid: int = Field(..., ge=100)
+    node: str
+    storage: str = "local"
+    iso_storage: str | None = Field(default=None, description="Stockage où se trouve l'ISO (si différent du stockage disque)")
+    iso_filename: str
+    name: str = "template-prepare"
+    vcpu: int = 2
+    ram_mb: int = 2048
+    storage_gb: int = 20

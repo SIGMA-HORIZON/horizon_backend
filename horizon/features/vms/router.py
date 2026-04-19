@@ -9,7 +9,7 @@ from horizon.features.vms import schemas
 from horizon.features.vms import service as vm_service
 from horizon.infrastructure.database import get_db
 from horizon.shared.dependencies import CurrentUser
-from horizon.shared.models import AuditAction, VirtualMachine
+from horizon.shared.models import AuditAction, VirtualMachine, VMStatus
 from horizon.shared.audit_service import log_action
 from horizon.shared.policies.enforcer import PolicyError, enforce_vm_ownership
 router = APIRouter(prefix="/vms", tags=["Machines Virtuelles"])
@@ -21,12 +21,12 @@ router = APIRouter(prefix="/vms", tags=["Machines Virtuelles"])
     status_code=201,
     summary="Créer une VM",
 )
-def create_vm(
+async def create_vm(
     body: schemas.VMCreateRequest,
     current_user: CurrentUser,
     db: Session = Depends(get_db),
 ):
-    vm = vm_service.create_vm(db, current_user.id, body.model_dump())
+    vm = await vm_service.create_vm(db, current_user.id, body.model_dump())
     return vm
 
 
@@ -48,6 +48,11 @@ def get_vm(vm_id: uuid.UUID, current_user: CurrentUser, db: Session = Depends(ge
     if not vm:
         raise PolicyError("VM", "VM introuvable.", 404)
     enforce_vm_ownership(vm.owner_id, current_user.id, current_user.role.value)
+
+    # Auto-refresh IP if missing and VM is active
+    if vm.status == VMStatus.ACTIVE and not vm.ip_address:
+        vm = vm_service.refresh_vm_status(db, vm_id, current_user.id, current_user.role.value)
+
     return vm
 
 
@@ -76,14 +81,14 @@ def update_vm(
     response_model=schemas.VMStopMessageResponse,
     summary="Éteindre une VM",
 )
-def stop_vm(vm_id: uuid.UUID, current_user: CurrentUser, db: Session = Depends(get_db)):
-    vm_service.stop_vm(db, vm_id, current_user.id, current_user.role.value)
+async def stop_vm(vm_id: uuid.UUID, current_user: CurrentUser, db: Session = Depends(get_db)):
+    await vm_service.stop_vm(db, vm_id, current_user.id, current_user.role.value)
     return schemas.VMStopMessageResponse(message="VM arrêtée.")
 
 
 @router.delete("/{vm_id}", status_code=204, summary="Supprimer définitivement une VM")
-def delete_vm(vm_id: uuid.UUID, current_user: CurrentUser, db: Session = Depends(get_db)):
-    vm_service.delete_vm(db, vm_id, current_user.id, current_user.role.value)
+async def delete_vm(vm_id: uuid.UUID, current_user: CurrentUser, db: Session = Depends(get_db)):
+    await vm_service.delete_vm(db, vm_id, current_user.id, current_user.role.value)
 
 
 @router.post(
@@ -137,3 +142,12 @@ def get_ssh_key(vm_id: uuid.UUID, current_user: CurrentUser, db: Session = Depen
         ssh_public_key=key_data,
         warning="Clé disponible une seule fois.",
     )
+
+
+@router.post(
+    "/{vm_id}/refresh",
+    response_model=schemas.VMResponse,
+    summary="Synchroniser l'état de la VM avec Proxmox (Force IP update)",
+)
+async def refresh_vm(vm_id: uuid.UUID, current_user: CurrentUser, db: Session = Depends(get_db)):
+    return vm_service.refresh_vm_status(db, vm_id, current_user.id, current_user.role.value)

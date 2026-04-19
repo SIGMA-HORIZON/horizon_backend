@@ -2,7 +2,7 @@
 
 import uuid
 
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, Query, UploadFile, File
 from sqlalchemy.orm import Session
 
 from horizon.features.admin import schemas
@@ -249,8 +249,8 @@ def patch_iso_template(
     response_model=schemas.ProxmoxSummaryResponse,
     summary="[Admin] Résumé global du cluster Proxmox (Temps Réel)",
 )
-def admin_proxmox_summary(admin: AdminUser):
-    return admin_service.get_proxmox_summary()
+async def admin_proxmox_summary(admin: AdminUser):
+    return await admin_service.get_proxmox_summary()
 
 
 @router.get("/isos", response_model=schemas.ISOImageListResponse, summary="[Admin] Liste toutes les images ISO")
@@ -268,3 +268,28 @@ def admin_list_proxmox_isos(admin: AdminUser, node: str = "pve", storage: str = 
     from horizon.infrastructure.proxmox_client import ProxmoxClient
     client = ProxmoxClient()
     return client.list_isos_on_storage(node, storage)
+
+
+@router.post("/proxmox/upload-iso", summary="[Admin] Uploader un fichier ISO sur Proxmox")
+async def admin_upload_proxmox_iso(
+    admin: AdminUser,
+    node: str = Query("pve"),
+    storage: str = Query("local"),
+    name: str | None = Query(None),
+    os_family: str = Query("LINUX"),
+    os_version: str = Query("Unknown"),
+    description: str | None = Query(None),
+    file: UploadFile = File(...),
+    db: Session = Depends(get_db),
+):
+    return await admin_service.upload_iso_to_proxmox(
+        db, admin.id, node, storage, file.file, file.filename,
+        name, os_family, os_version, description
+    )
+
+
+@router.post("/proxmox/prepare-template", summary="[Admin] Préparer une VM à partir d'un ISO pour en faire un template")
+async def admin_prepare_template(
+    body: schemas.PrepareTemplateRequest, admin: AdminUser, db: Session = Depends(get_db)
+):
+    return await admin_service.prepare_vm_template(db, body)
