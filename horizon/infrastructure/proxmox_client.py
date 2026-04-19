@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+import urllib.parse
 from typing import Any
 
 import urllib3
@@ -48,6 +49,7 @@ class ProxmoxClient:
                 token_name=tid,
                 token_value=ts,
                 verify_ssl=self._settings.PROXMOX_VERIFY_SSL,
+                timeout=self._settings.PROXMOX_TIMEOUT,
             )
         except Exception as e:
             logger.exception("Init ProxmoxAPI")
@@ -76,15 +78,28 @@ class ProxmoxClient:
     ) -> dict[str, Any]:
         try:
             n = self._nodes(node)
-            n.qemu(template_vmid).clone.post(newid=new_vmid, name=name, full=1)
+            n.qemu(template_vmid).clone.post(
+                newid=new_vmid,
+                name=name,
+                full=1,
+                timeout=self._settings.PROXMOX_TIMEOUT
+            )
             
             config_params = {"memory": memory_mb, "cores": cores, "net0": net0}
             if ssh_key:
                 # Injection via Cloud-Init (nécessite que le template ait Cloud-Init)
-                config_params["sshkeys"] = ssh_key
-                
-            n.qemu(new_vmid).config.post(**config_params)
-            n.qemu(new_vmid).status.start.post()
+                # On encode tout (safe='') et on retire tout retour à la ligne
+                clean_key = ssh_key.strip().replace("\r", "").replace("\n", "")
+                config_params["sshkeys"] = urllib.parse.quote(clean_key, safe='')
+            
+            logger.debug(f"Proxmox config VM {new_vmid}: {config_params}")
+            n.qemu(new_vmid).config.post(
+                **config_params, 
+                timeout=self._settings.PROXMOX_TIMEOUT
+            )
+            n.qemu(new_vmid).status.start.post(
+                timeout=self._settings.PROXMOX_TIMEOUT
+            )
             return {"status": "success", "message": f"VM {name} ({new_vmid}) clonée et démarrée."}
         except Exception as e:
             logger.exception("create_vm_from_template")
@@ -144,6 +159,16 @@ class ProxmoxClient:
         except Exception as e:
             logger.error(f"Erreur lors de la récupération des ISOs sur {node}/{storage}: {e}")
             return []
+
+    def get_next_vmid(self) -> int:
+        """Récupère le prochain VMID disponible sur le cluster."""
+        if not self._api:
+            raise ProxmoxIntegrationError("Proxmox désactivé.", 503)
+        try:
+            return int(self._api.cluster.nextid.get())
+        except Exception as e:
+            logger.exception("get_next_vmid")
+            raise ProxmoxIntegrationError(str(e), 502) from e
 
 
     def get_cluster_status(self) -> dict[str, Any]:

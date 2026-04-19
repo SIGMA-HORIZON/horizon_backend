@@ -268,3 +268,8 @@ def admin_list_proxmox_isos(admin: AdminUser, node: str = "pve", storage: str = 
     from horizon.infrastructure.proxmox_client import ProxmoxClient
     client = ProxmoxClient()
     return client.list_isos_on_storage(node, storage)
+
+
+@router.get("/reservations", response_model=schemas.ReservationListResponse, summary="[Admin] Liste toutes les réservations")
+def admin_list_reservations(admin: AdminUser, db: Session = Depends(get_db)):
+    return admin_service.list_reservations(db)

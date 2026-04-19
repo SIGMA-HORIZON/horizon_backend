@@ -370,8 +370,25 @@ def _select_node(db: Session) -> PhysicalNode:
 
 
 def _next_proxmox_vmid(db: Session) -> int:
-    max_id = db.query(func.max(VirtualMachine.proxmox_vmid)).scalar()
-    return (max_id or 100) + 1
+    s = get_settings()
+    db_max = db.query(func.max(VirtualMachine.proxmox_vmid)).scalar() or 100
+    candidate = db_max + 1
+
+    if s.PROXMOX_ENABLED:
+        try:
+            from horizon.infrastructure.proxmox_client import ProxmoxClient
+            client = ProxmoxClient()
+            if client.enabled:
+                # Vérifier tous les IDs réservés sur le cluster Proxmox
+                resources = client._api.cluster.resources.get(type="vm")
+                taken_proxmox_ids = {r["vmid"] for r in resources}
+                
+                while candidate in taken_proxmox_ids:
+                    candidate += 1
+        except Exception:
+            pass
+
+    return candidate
 
 
 def _assign_vlan(db: Session, owner_id) -> int:

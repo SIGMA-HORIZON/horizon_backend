@@ -78,6 +78,7 @@ class Settings(BaseSettings):
     PROXMOX_VERIFY_SSL: bool = False
     PROXMOX_DEFAULT_NODE: str = ""
     PROXMOX_NET0_TEMPLATE: str = "virtio,bridge=vmbr0"
+    PROXMOX_TIMEOUT: int = 120
 
 
 @lru_cache
