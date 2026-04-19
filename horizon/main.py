@@ -14,6 +14,7 @@ from horizon.core.constants import API_V1_PREFIX
 from horizon.features.accounts.router import router as accounts_router
 from horizon.features.admin.router import router as admin_router
 from horizon.features.auth.router import router as auth_router
+from horizon.features.infra.router import router as infra_router
 from horizon.features.vms.router import router as vms_router
 from horizon.infrastructure.scheduler import start_scheduler, stop_scheduler
 from horizon.shared.middleware.security import HTTPSEnforcementMiddleware
@@ -64,6 +65,7 @@ api_v1 = APIRouter(prefix=API_V1_PREFIX)
 api_v1.include_router(auth_router)
 api_v1.include_router(accounts_router)
 api_v1.include_router(vms_router)
+api_v1.include_router(infra_router)
 api_v1.include_router(admin_router)
 app.include_router(api_v1)
 

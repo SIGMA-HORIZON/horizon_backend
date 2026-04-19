@@ -14,6 +14,8 @@ settings = get_settings()
 class PolicyError(HTTPException):
     def __init__(self, policy_id: str, detail: str, status_code: int = status.HTTP_403_FORBIDDEN):
         super().__init__(status_code=status_code, detail=f"[{policy_id}] {detail}")
+        self.http_status = status_code
+        self.message = self.detail
 
 
 def enforce_password_strength(password: str) -> None:

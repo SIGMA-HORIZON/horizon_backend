@@ -92,6 +92,8 @@ class Settings(BaseSettings):
     # Réseau
     PROXMOX_NET0_TEMPLATE: str = "virtio,bridge=vmbr0,firewall=1"
 
+    PROXMOX_DEFAULT_NODE: str = "MAITRE"
+
     # Fallback VMID (si next_free_vmid Proxmox indisponible)
     PROXMOX_VMID_BASE: int = 200
 
