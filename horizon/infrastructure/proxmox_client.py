@@ -82,7 +82,6 @@ class ProxmoxClient:
                 newid=new_vmid,
                 name=name,
                 full=1,
-                timeout=self._settings.PROXMOX_TIMEOUT
             )
             
             config_params = {"memory": memory_mb, "cores": cores, "net0": net0}
@@ -95,11 +94,8 @@ class ProxmoxClient:
             logger.debug(f"Proxmox config VM {new_vmid}: {config_params}")
             n.qemu(new_vmid).config.post(
                 **config_params, 
-                timeout=self._settings.PROXMOX_TIMEOUT
             )
-            n.qemu(new_vmid).status.start.post(
-                timeout=self._settings.PROXMOX_TIMEOUT
-            )
+            n.qemu(new_vmid).status.start.post()
             return {"status": "success", "message": f"VM {name} ({new_vmid}) clonée et démarrée."}
         except Exception as e:
             logger.exception("create_vm_from_template")
