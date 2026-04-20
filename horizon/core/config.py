@@ -80,6 +80,7 @@ class Settings(BaseSettings):
     PROXMOX_NODE: str = ""
     PROXMOX_NET0_TEMPLATE: str = "virtio,bridge=vmbr0"
     PROXMOX_VLAN_ISOLATION: bool = True
+    PROXMOX_TIMEOUT: int = 120
 
 
 @lru_cache

@@ -176,6 +176,24 @@ class IsoProxmoxTemplatePatch(BaseModel):
     proxmox_template_vmid: int = Field(..., ge=1)
 
 
+class ReservationRowResponse(BaseModel):
+    id: UUID
+    vm_name: str
+    user_full_name: str
+    user_email: str
+    os_name: str
+    vcpu: int
+    ram_gb: float
+    storage_gb: float
+    duration_hours: int
+    status: str
+    created_at: datetime
+
+
+class ReservationListResponse(BaseModel):
+    items: list[ReservationRowResponse]
+
+
 class ISOImageResponse(BaseModel):
     model_config = {"from_attributes": True}
     id: UUID
@@ -228,3 +246,17 @@ class PrepareTemplateRequest(BaseModel):
     vcpu: int = 2
     ram_mb: int = 2048
     storage_gb: int = 20
+
+
+class ProxmoxCreateVMRequest(BaseModel):
+    vmid: int = Field(..., ge=100)
+    node: str
+    storage: str = "local"
+    iso_storage: str | None = Field(default=None)
+    iso_filename: str
+    name: str
+    vcpu: int = 1
+    ram_mb: int = 1024
+    storage_gb: int = 10
+    net0: str = "virtio,bridge=vmbr0"
+
