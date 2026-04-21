@@ -164,15 +164,10 @@ class ProxmoxClient:
             upid_start = n.qemu(new_vmid).status.start.post()
             await self.wait_for_task(node, upid_start)
 
-            # Polling for IP address before returning
-            logger.info(f"VM started. Polling for IP for VMID {new_vmid}...")
-            ips = await self.wait_for_vm_ip(node, new_vmid)
-            ip = ips[0] if ips else None
-
             return {
                 "status": "success",
                 "message": f"VM {name} ({new_vmid}) clonée et démarrée.",
-                "ip_address": ip
+                "ip_address": None
             }
         except Exception as e:
             logger.exception("create_vm_from_template")
@@ -267,6 +262,16 @@ class ProxmoxClient:
                 raise
             raise ProxmoxIntegrationError(str(e), 502) from e
 
+    async def get_vnc_proxy(self, node: str, vmid: int) -> dict[str, Any]:
+        """Génère un ticket VNC pour noVNC."""
+        try:
+            # Proxmoxer return a dict with 'ticket', 'port', 'upid', 'user'
+            res = self._nodes(node).qemu(vmid).vncproxy.post()
+            return res
+        except Exception as e:
+            logger.exception("get_vnc_proxy")
+            raise ProxmoxIntegrationError(f"Erreur lors de la création du proxy VNC : {e}", 502) from e
+
     def list_node_qemu(self, node: str) -> list[Any]:
         try:
             return self._nodes(node).qemu.get()
@@ -358,8 +363,8 @@ class ProxmoxClient:
                 "filename": (filename, wrapped_file)
             }
 
-            # On utilise requests.post directement
-            # En passant un objet qui a une méthode __len__, requests peut calculer le Content-Length
+            logger.info(f"Début de l'envoi de l'ISO '{filename}' vers Proxmox ({node}/{storage})...")
+
             response = await asyncio.to_thread(
                 requests.post,
                 url,
@@ -367,7 +372,7 @@ class ProxmoxClient:
                 data=data,
                 files=files,
                 verify=self._settings.PROXMOX_VERIFY_SSL,
-                timeout=600  # 10 minutes
+                timeout=3600  # 1 heure pour les gros ISO
             )
 
             if response.status_code not in (200, 201):
@@ -379,7 +384,8 @@ class ProxmoxClient:
 
             out = response.json()
             upid = out["data"]
-            await self.wait_for_task(node, upid)
+            # Attendre la fin du déplacement du fichier côté Proxmox (peut être long pour de gros ISO)
+            await self.wait_for_task(node, upid, timeout=1800)
             return {"status": "success", "message": f"ISO {filename} uploadé avec succès sur {node}/{storage}."}
 
         except requests.exceptions.RequestException as e:

@@ -12,8 +12,9 @@ class VMCreateRequest(BaseModel):
     vcpu: int = Field(..., alias="cpu")
     ram_gb: float = Field(..., alias="ram")
     storage_gb: float = Field(..., alias="storage")
-    session_hours: int = 2  # Par défaut 2 heures si non précisé par le frontend
+    session_hours: int = 2
     description: str | None = None
+    ssh_public_key: str | None = None
 
     model_config = {
         "populate_by_name": True,  # Permet d'utiliser soit le nom réel soit l'alias
@@ -35,6 +36,7 @@ class VMCreateRequest(BaseModel):
 
 
 class VMUpdateRequest(BaseModel):
+    name: str | None = None
     vcpu: int | None = None
     ram_gb: float | None = None
     storage_gb: float | None = None
@@ -54,6 +56,9 @@ class VMResponse(BaseModel):
     lease_start: datetime
     lease_end: datetime
     ip_address: str | None
+    ssh_public_key: str | None = None
+    cpu_usage: float | None = 0.0
+    ram_usage: float | None = 0.0
 
     @field_validator("status", mode="before")
     @classmethod

@@ -133,9 +133,16 @@ async def create_vm(db: Session, owner_id, data: dict) -> VirtualMachine:
     )
     db.add(reservation)
 
-    # Génération d'une paire de clés SSH spécifique à cette VM
-    private_key, public_key = generate_ssh_key_pair()
-    vm.ssh_public_key = private_key  # Stockée temporairement pour le téléchargement unique
+    # Gestion des clés SSH
+    user_ssh_key = data.get("ssh_public_key")
+    if user_ssh_key:
+        public_key = user_ssh_key
+        private_key = None
+        vm.ssh_public_key = None  # Pas de clé privée à télécharger car fournie par l'utilisateur
+    else:
+        # Génération d'une paire de clés SSH spécifique à cette VM
+        private_key, public_key = generate_ssh_key_pair()
+        vm.ssh_public_key = private_key  # Stockée temporairement pour le téléchargement unique
 
     try:
         db.flush()
@@ -238,6 +245,31 @@ async def stop_vm(db: Session, vm_id, requesting_user_id, user_role: str, force:
     db.commit()
 
 
+async def start_vm(db: Session, vm_id, requesting_user_id, user_role: str) -> None:
+    from horizon.infrastructure.proxmox_client import ProxmoxClient, ProxmoxIntegrationError
+
+    vm = _get_vm_or_404(db, vm_id)
+    enforce_vm_ownership(vm.owner_id, requesting_user_id, user_role)
+
+    if vm.status == VMStatus.ACTIVE:
+        # On vérifie si elle est "vraiment" active sur Proxmox ou si c'est juste le statut DB
+        pass
+
+    s = get_settings()
+    if s.PROXMOX_ENABLED:
+        try:
+            client = ProxmoxClient()
+            if client.enabled:
+                px_node = _resolve_proxmox_node_name(db, vm.node)
+                await client.start_vm(px_node, vm.proxmox_vmid)
+        except ProxmoxIntegrationError as e:
+            raise PolicyError("PROXMOX", e.message, e.status_code) from e
+
+    vm.status = VMStatus.ACTIVE
+    log_action(db, requesting_user_id, AuditAction.VM_STARTED, "vm", vm.id)
+    db.commit()
+
+
 async def delete_vm(db: Session, vm_id, requesting_user_id, user_role: str) -> None:
     from horizon.infrastructure.proxmox_client import ProxmoxClient, ProxmoxIntegrationError
 
@@ -293,6 +325,8 @@ def update_vm(db: Session, vm_id, requesting_user_id, user_role: str, data: dict
     vm.vcpu = new_vcpu
     vm.ram_gb = new_ram
     vm.storage_gb = new_storage
+    if "name" in data:
+        vm.name = data["name"]
 
     log_action(
         db,
