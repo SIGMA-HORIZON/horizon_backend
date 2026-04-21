@@ -6,15 +6,42 @@ from sqlalchemy.orm import Session
 from horizon.core.config import get_settings
 from horizon.features.vms import schemas
 from horizon.features.vms import service as vm_service
+from horizon.features.vms.service import _resolve_proxmox_node_name
 from horizon.infrastructure.database import get_db
-
-settings = get_settings()
 from horizon.shared.dependencies import CurrentUser
 from horizon.shared.models import AuditAction, VirtualMachine, VMStatus
 from horizon.shared.audit_service import log_action
 from horizon.shared.policies.enforcer import PolicyError, enforce_vm_ownership
 
+settings = get_settings()
 router = APIRouter(prefix="/vms", tags=["Machines Virtuelles"])
+
+
+@router.get("/cluster-status", summary="État rapide du cluster (tous les utilisateurs authentifiés)")
+async def get_cluster_status(current_user: CurrentUser):
+    """
+    Retourne uniquement le statut online/offline du cluster et le nombre de nœuds,
+    sans exposer les noms des nœuds ni la topologie de l'infrastructure.
+    Utilise un appel direct à l'API Proxmox pour éviter tout état mis en cache.
+    """
+    from horizon.core.config import get_settings
+    from horizon.infrastructure.proxmox_client import ProxmoxClient
+
+    settings = get_settings()
+    if not settings.PROXMOX_ENABLED:
+        return {"online": False, "total_nodes": 0, "online_nodes": 0}
+    try:
+        client = ProxmoxClient()
+        # Appel direct — lève une exception si Proxmox est inaccessible
+        nodes = client.api.nodes.get()
+        online_nodes = sum(1 for n in nodes if n.get("status") == "online")
+        return {
+            "online": online_nodes > 0,
+            "total_nodes": len(nodes),
+            "online_nodes": online_nodes,
+        }
+    except Exception:
+        return {"online": False, "total_nodes": 0, "online_nodes": 0}
 
 
 @router.get("/available-isos", summary="Lister les images ISO disponibles")
@@ -40,7 +67,19 @@ def get_my_quota(current_user: CurrentUser, db: Session = Depends(get_db)):
     }
 
 
-
+@router.post(
+    "",
+    response_model=schemas.VMResponse,
+    status_code=201,
+    summary="Créer une VM",
+)
+async def create_vm(
+    body: schemas.VMCreateRequest,
+    current_user: CurrentUser,
+    db: Session = Depends(get_db),
+):
+    vm = await vm_service.create_vm(db, current_user.id, body.model_dump())
+    return vm
 
 
 @router.get(
@@ -69,7 +108,7 @@ async def get_vm_console(
     if not client.enabled:
         raise HTTPException(status_code=503, detail="Service Proxmox indisponible")
 
-    px_node = vm_service._resolve_proxmox_node_name(db, vm.node)
+    px_node = _resolve_proxmox_node_name(db, vm.node)
     try:
         vnc_data = await client.get_vnc_proxy(px_node, vm.proxmox_vmid)
         # On ajoute des infos pour que le frontend sache où se connecter
@@ -94,7 +133,7 @@ def get_vm(vm_id: uuid.UUID, current_user: CurrentUser, db: Session = Depends(ge
         try:
             client = ProxmoxClient()
             if client.enabled:
-                px_node = vm_service._resolve_proxmox_node_name(db, vm.node)
+                px_node = _resolve_proxmox_node_name(db, vm.node)
                 status = client.get_vm_current_status(px_node, vm.proxmox_vmid)
                 
                 # Attacher les stats dynamiques (non persistées en DB)

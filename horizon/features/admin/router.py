@@ -253,6 +253,15 @@ async def admin_proxmox_summary(admin: AdminUser):
     return await admin_service.get_proxmox_summary()
 
 
+@router.get(
+    "/proxmox/health",
+    response_model=schemas.ProxmoxHealthResponse,
+    summary="[Admin] État de santé rapide du cluster Proxmox",
+)
+async def admin_proxmox_health(admin: AdminUser):
+    return await admin_service.check_proxmox_health()
+
+
 @router.get("/isos", response_model=schemas.ISOImageListResponse, summary="[Admin] Liste toutes les images ISO")
 def admin_list_isos(admin: AdminUser, db: Session = Depends(get_db)):
     return admin_service.list_iso_images(db)

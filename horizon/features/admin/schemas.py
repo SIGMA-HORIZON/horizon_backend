@@ -124,6 +124,12 @@ class ProxmoxOperationResponse(BaseModel):
     message: str
 
 
+class ProxmoxHealthResponse(BaseModel):
+    online: bool
+    nodes_up: int
+    nodes_total: int
+
+
 class ProxmoxQemuListResponse(BaseModel):
     count: int
     items: list[dict[str, Any]]
@@ -239,7 +245,7 @@ class ProxmoxSummaryResponse(BaseModel):
 class PrepareTemplateRequest(BaseModel):
     vmid: int = Field(..., ge=100)
     node: str
-    storage: str = "local"
+    storage: str = "local-lvm"
     iso_storage: str | None = Field(default=None, description="Stockage où se trouve l'ISO (si différent du stockage disque)")
     iso_filename: str
     name: str = "template-prepare"
@@ -251,7 +257,7 @@ class PrepareTemplateRequest(BaseModel):
 class ProxmoxCreateVMRequest(BaseModel):
     vmid: int = Field(..., ge=100)
     node: str
-    storage: str = "local"
+    storage: str = "local-lvm"
     iso_storage: str | None = Field(default=None)
     iso_filename: str
     name: str

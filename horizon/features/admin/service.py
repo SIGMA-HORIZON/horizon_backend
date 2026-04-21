@@ -1,5 +1,6 @@
 """Logique métier réservée aux administrateurs."""
 
+import logging
 import uuid
 from typing import Any
 
@@ -20,6 +21,8 @@ from horizon.shared.models import (
 )
 from horizon.shared.models.virtual_machine import PhysicalNode
 from horizon.shared.policies.enforcer import PolicyError
+
+logger = logging.getLogger(__name__)
 
 
 def build_admin_vm_dashboard(db: Session) -> schemas.AdminVMListResponse:
@@ -300,6 +303,29 @@ async def get_proxmox_summary() -> schemas.ProxmoxSummaryResponse:
         raise PolicyError("PROXMOX", e.message, e.status_code) from e
 
 
+async def check_proxmox_health() -> schemas.ProxmoxHealthResponse:
+    from horizon.infrastructure.proxmox_client import (
+        ProxmoxClient,
+        ProxmoxIntegrationError,
+    )
+
+    if not get_settings().PROXMOX_ENABLED:
+        return schemas.ProxmoxHealthResponse(online=False, nodes_up=0, nodes_total=0)
+
+    try:
+        client = ProxmoxClient()
+        # On utilise un appel léger pour vérifier la santé
+        nodes = client._api.nodes.get()
+        nodes_up = sum(1 for n in nodes if n.get("status") == "online")
+        return schemas.ProxmoxHealthResponse(
+            online=True,
+            nodes_up=nodes_up,
+            nodes_total=len(nodes)
+        )
+    except Exception:
+        return schemas.ProxmoxHealthResponse(online=False, nodes_up=0, nodes_total=0)
+
+
 async def upload_iso_to_proxmox(
     db: Session,
     admin_id: uuid.UUID,
@@ -318,6 +344,7 @@ async def upload_iso_to_proxmox(
     )
 
     _require_proxmox_enabled()
+    os_family = os_family.upper()
     try:
         client = ProxmoxClient()
         # 1. Upload physique vers Proxmox
@@ -350,11 +377,12 @@ async def prepare_vm_template(db: Session, body: schemas.PrepareTemplateRequest)
         ProxmoxClient,
         ProxmoxIntegrationError,
     )
-
+    
     _require_proxmox_enabled()
     try:
         client = ProxmoxClient()
-        return await client.prepare_vm_for_template(
+        # On prépare la VM sur Proxmox
+        res = await client.prepare_vm_for_template(
             node=body.node,
             vmid=body.vmid,
             storage=body.storage,
@@ -365,6 +393,28 @@ async def prepare_vm_template(db: Session, body: schemas.PrepareTemplateRequest)
             storage_gb=body.storage_gb,
             iso_storage=body.iso_storage
         )
+        
+        # On enregistre automatiquement le template dans la base de données
+        # On cherche l'ISO correspondante par son nom de fichier
+        iso = db.query(ISOImage).filter(ISOImage.filename == body.iso_filename).first()
+        if iso:
+            # Vérifier si un mapping existe déjà pour cet ISO (on le met à jour ou on ignore)
+            existing_template = db.query(IsoProxmoxTemplate).filter(IsoProxmoxTemplate.iso_image_id == iso.id).first()
+            if existing_template:
+                existing_template.proxmox_template_vmid = body.vmid
+            else:
+                new_template = IsoProxmoxTemplate(
+                    iso_image_id=iso.id,
+                    proxmox_template_vmid=body.vmid
+                )
+                db.add(new_template)
+            
+            db.commit()
+            logger.info(f"Template auto-enregistré : ISO {iso.name} -> VMID {body.vmid}")
+        else:
+            logger.warning(f"Impossible d'auto-enregistrer le template : ISO {body.iso_filename} non trouvée en base.")
+            
+        return res
     except ProxmoxIntegrationError as e:
         raise PolicyError("PROXMOX", e.message, e.status_code) from e
 

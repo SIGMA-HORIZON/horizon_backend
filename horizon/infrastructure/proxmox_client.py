@@ -52,7 +52,7 @@ class ProxmoxClient:
 
     def __init__(self) -> None:
         self._settings = get_settings()
-        self._api: Any | None = None
+        self._api_instance: Any | None = None
         if not self._settings.PROXMOX_ENABLED:
             return
         h = self._settings.PROXMOX_HOST
@@ -73,7 +73,7 @@ class ProxmoxClient:
         try:
             from proxmoxer import ProxmoxAPI
 
-            self._api = ProxmoxAPI(
+            self._api_instance = ProxmoxAPI(
                 host_str,
                 user=u,
                 token_name=tn,
@@ -87,25 +87,26 @@ class ProxmoxClient:
                 f"Connexion Proxmox impossible : {e}", 502) from e
 
     @property
+    def api(self) -> Any:
+        """Accès à l'instance configurée de ProxmoxAPI (lève une erreur si absente)."""
+        if self._api_instance is None:
+            raise ProxmoxIntegrationError("Proxmox désactivé ou non configuré.", 503)
+        return self._api_instance
+
+    @property
     def enabled(self) -> bool:
-        return self._api is not None
+        return self._api_instance is not None
 
     def _nodes(self, node: str):
-        if not self._api:
-            raise ProxmoxIntegrationError("Proxmox désactivé.", 503)
-        return self._api.nodes(node)
+        return self.api.nodes(node)
 
     async def wait_for_task(self, node: str, upid: str, timeout: int = 300, interval: int = 2) -> dict[str, Any]:
         """Attend la fin d'une tâche Proxmox (UPID)."""
-        if not self._api:
-            raise ProxmoxIntegrationError("Proxmox désactivé.", 503)
-            
         start_time = time.time()
         while time.time() - start_time < timeout:
             try:
-                # Appel synchrone via proxmoxer, on peut le wrapper si on veut être puriste
-                # mais dans un threadpool FastAPI ça passe. Ici on utilise asyncio.sleep pour ne pas bloquer.
-                status = self._api.nodes(node).tasks(upid).status.get()
+                # Appel synchrone via proxmoxer
+                status = self.api.nodes(node).tasks(upid).status.get()
                 
                 if status.get("status") == "stopped":
                     exitstatus = status.get("exitstatus")
@@ -190,11 +191,9 @@ class ProxmoxClient:
         agent: int = 1
     ) -> dict[str, Any]:
         """Crée une VM directement à partir d'un ISO (sans template)."""
-        if not self._api:
-            raise ProxmoxIntegrationError("Proxmox désactivé.", 503)
         try:
             n = self._nodes(node)
-            iso_path_storage = iso_storage or storage
+            iso_path_storage = iso_storage or "nfs-shared-iso"
             
             params = {
                 "vmid": vmid,
@@ -288,7 +287,7 @@ class ProxmoxClient:
 
     def get_vm_ips(self, node: str, vmid: int) -> list[str]:
         """Récupère les adresses IPv4 du guest via l'agent QEMU."""
-        if not self._api:
+        if not self.enabled:
             return []
         try:
             res = self._nodes(node).qemu(vmid).agent("network-get-interfaces").get()
@@ -363,8 +362,12 @@ class ProxmoxClient:
                 "filename": (filename, wrapped_file)
             }
 
+<<<<<<< Updated upstream
             logger.info(f"Début de l'envoi de l'ISO '{filename}' vers Proxmox ({node}/{storage})...")
 
+=======
+            # On utilise requests.post directement
+>>>>>>> Stashed changes
             response = await asyncio.to_thread(
                 requests.post,
                 url,
@@ -452,33 +455,27 @@ class ProxmoxClient:
 
     def get_next_vmid(self) -> int:
         """Récupère le prochain VMID disponible sur le cluster."""
-        if not self._api:
-            raise ProxmoxIntegrationError("Proxmox désactivé.", 503)
         try:
-            return int(self._api.cluster.nextid.get())
+            return int(self.api.cluster.nextid.get())
         except Exception as e:
             logger.exception("get_next_vmid")
             raise ProxmoxIntegrationError(str(e), 502) from e
 
-
     def get_cluster_status(self) -> dict[str, Any]:
         """Récupère un résumé global du datacenter Proxmox via l'API cluster/resources."""
-        if not self._api:
-            raise ProxmoxIntegrationError("Proxmox désactivé.", 503)
         try:
             # Récupérer les nœuds et les ressources en deux appels seulement
-            all_nodes = self._api.nodes.get()
-            all_resources = self._api.cluster.resources.get(type="vm")
+            all_nodes = self.api.nodes.get()
+            all_resources = self.api.cluster.resources.get(type="vm")
             
-            summary = {
-                "nodes": [],
-                "total_vms": len(all_resources),
-                "active_vms": sum(1 for r in all_resources if r.get("status") == "running"),
-                "total_cpus": 0,
-                "used_cpus": 0,
-                "total_memory": 0,
-                "used_memory": 0
-            }
+            total_vms = len(all_resources)
+            active_vms = sum(1 for r in all_resources if r.get("status") == "running")
+            
+            nodes_data = []
+            total_cpus = 0
+            used_cpus = 0
+            total_memory = 0
+            used_memory = 0
 
             # Grouper les ressources par nœud pour faciliter le mapping
             vms_by_node = {}
@@ -489,20 +486,41 @@ class ProxmoxClient:
                 vms_by_node[nodename] += 1
 
             for node in all_nodes:
-                n_vms_count = vms_by_node.get(node["node"], 0)
+                nodename = node["node"]
+                n_vms_count = vms_by_node.get(nodename, 0)
+                
+                # Update global stats
+                node_cpu_ratio = node.get("cpu", 0)
+                node_maxcpu = node.get("maxcpu", 0)
+                node_maxmem = node.get("maxmem", 0)
+                node_mem = node.get("mem", 0)
+                
+                total_cpus += node_maxcpu
+                used_cpus += int(node_cpu_ratio * node_maxcpu)
+                total_memory += node_maxmem
+                used_memory += node_mem
+
                 n_info = {
-                    "name": node["node"],
+                    "name": nodename,
                     "status": node["status"],
-                    "cpu": node.get("cpu", 0),
+                    "cpu": node_cpu_ratio,
                     "memory": {
-                        "total": node.get("maxmem", 0),
-                        "used": node.get("mem", 0)
+                        "total": node_maxmem,
+                        "used": node_mem
                     },
                     "vms_count": n_vms_count
                 }
-                summary["nodes"].append(n_info)
+                nodes_data.append(n_info)
 
-            return summary
+            return {
+                "nodes": nodes_data,
+                "total_vms": total_vms,
+                "active_vms": active_vms,
+                "total_cpus": total_cpus,
+                "used_cpus": used_cpus,
+                "total_memory": total_memory,
+                "used_memory": used_memory
+            }
         except Exception as e:
             logger.exception("get_cluster_status")
             raise ProxmoxIntegrationError(str(e), 502) from e
