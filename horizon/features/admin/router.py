@@ -5,6 +5,7 @@ import uuid
 from fastapi import APIRouter, Depends, Query, UploadFile, File
 from sqlalchemy.orm import Session
 
+from horizon.shared.dependencies import CurrentUser
 from horizon.features.admin import schemas
 from horizon.features.admin import service as admin_service
 from horizon.features.vms import service as vm_service
@@ -297,11 +298,13 @@ async def admin_upload_proxmox_iso(
     )
 
 
-@router.post("/proxmox/create-vm", summary="[Admin] Créer une VM directement depuis un ISO (sans template)")
+@router.post("/proxmox/create-vm", summary="Créer une VM directement depuis un ISO (sans template)")
 async def admin_create_proxmox_vm(
-    body: schemas.ProxmoxCreateVMRequest, admin: AdminUser, db: Session = Depends(get_db)
+    body: schemas.ProxmoxCreateVMRequest, 
+    current_user: CurrentUser,
+    db: Session = Depends(get_db)
 ):
-    return await admin_service.create_vm_directly(db, body)
+    return await admin_service.create_vm_directly(db, current_user.id, body)
 
 
 @router.post("/proxmox/prepare-template", summary="[Admin] Préparer une VM à partir d'un ISO pour en faire un template")

@@ -420,26 +420,101 @@ async def prepare_vm_template(db: Session, body: schemas.PrepareTemplateRequest)
 
 
 async def create_vm_directly(db: Session, body: schemas.ProxmoxCreateVMRequest) -> dict[str, Any]:
-    from horizon.infrastructure.proxmox_client import (
-        ProxmoxClient,
-        ProxmoxIntegrationError,
-    )
+    from horizon.infrastructure.proxmox_client import ProxmoxClient, ProxmoxIntegrationError
+    from datetime import datetime, timezone, timedelta
+    from horizon.shared.models import VirtualMachine, Reservation, ISOImage, ProxmoxNodeMapping
+    from horizon.shared.models.virtual_machine import PhysicalNode, VMStatus
+    import uuid as _uuid
 
     _require_proxmox_enabled()
-    try:
-        client = ProxmoxClient()
-        return await client.create_vm(
-            node=body.node,
-            vmid=body.vmid,
-            name=body.name,
-            storage=body.storage,
-            iso_filename=body.iso_filename,
-            vcpu=body.vcpu,
-            ram_mb=body.ram_mb,
-            storage_gb=body.storage_gb,
-            iso_storage=body.iso_storage,
-            net0=body.net0
-        )
-    except ProxmoxIntegrationError as e:
-        raise PolicyError("PROXMOX", e.message, e.status_code) from e
 
+    if not body.owner_id:
+        raise PolicyError("VM", "owner_id is required to register VM in database.", 422)
+
+    now = datetime.now(timezone.utc)
+
+    # Resolve physical node
+    mapping = db.query(ProxmoxNodeMapping).filter(
+        ProxmoxNodeMapping.proxmox_node_name == body.node
+    ).first()
+    physical_node = mapping.physical_node if mapping else PhysicalNode.REM
+
+    # Try to link ISO by filename
+    iso = db.query(ISOImage).filter(ISOImage.filename == body.iso_filename).first()
+    iso_id = iso.id if iso else None
+
+    # Stage the VM record before touching Proxmox
+    vm = VirtualMachine(
+        id=_uuid.uuid4(),
+        proxmox_vmid=body.vmid,
+        name=body.name,
+        description=None,
+        owner_id=_uuid.UUID(body.owner_id),
+        node=physical_node,
+        vcpu=body.vcpu,
+        ram_gb=round(float(body.ram_mb) / 1024.0, 3),
+        storage_gb=body.storage_gb,
+        iso_image_id=iso_id,
+        status=VMStatus.PENDING,
+        lease_start=now,
+        lease_end=now + timedelta(hours=body.session_hours),
+        vlan_id=None,
+        ip_address=None,
+        ssh_public_key=body.ssh_public_key,
+        shared_space_gb=0.0,
+    )
+    db.add(vm)
+
+    reservation = Reservation(
+        id=_uuid.uuid4(),
+        vm_id=vm.id,
+        user_id=_uuid.UUID(body.owner_id),
+        start_time=vm.lease_start,
+        end_time=vm.lease_end,
+    )
+    db.add(reservation)
+
+    try:
+        db.flush()  # Validate constraints before hitting Proxmox
+
+        try:
+            client = ProxmoxClient()
+        except ProxmoxIntegrationError as e:
+            raise PolicyError("PROXMOX", e.message, e.status_code) from e
+
+        try:
+            res = await client.create_vm(
+                node=body.node,
+                vmid=body.vmid,
+                name=body.name,
+                storage=body.storage,
+                iso_filename=body.iso_filename,
+                vcpu=body.vcpu,
+                ram_mb=body.ram_mb,
+                storage_gb=body.storage_gb,
+                iso_storage=body.iso_storage,
+                net0=body.net0,
+                ssh_key=body.ssh_public_key,
+            )
+            await client.start_vm(node=body.node, vmid=body.vmid)
+        except ProxmoxIntegrationError as e:
+            raise PolicyError("PROXMOX", e.message, e.status_code) from e
+
+        vm.status = VMStatus.ACTIVE
+        db.commit()
+        db.refresh(vm)
+
+        return {
+            "proxmox": res,
+            "vm": {
+                "id": str(vm.id),
+                "proxmox_vmid": vm.proxmox_vmid,
+                "name": vm.name,
+            },
+        }
+    except PolicyError:
+        db.rollback()
+        raise
+    except Exception:
+        db.rollback()
+        raise

@@ -81,6 +81,14 @@ async def create_vm(
     vm = await vm_service.create_vm(db, current_user.id, body.model_dump())
     return vm
 
+@router.post("/proxmox/create-vm", summary="Créer une VM directement depuis un ISO (sans template)")
+async def admin_create_proxmox_vm(
+    body: schemas.ProxmoxCreateVMRequest, 
+    current_user: CurrentUser,
+    db: Session = Depends(get_db)
+):
+    return await vm_service.create_vm_directly(db, current_user.id, body)
+
 
 @router.get(
     "",

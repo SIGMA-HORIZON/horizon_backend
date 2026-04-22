@@ -52,6 +52,17 @@ def task_expire_vms():
             )
             .all()
         )
+        # If configured, attempt to delete expired VMs on Proxmox and remove DB rows.
+        from horizon.infrastructure.proxmox_client import ProxmoxClient
+        from horizon.shared.models import ProxmoxNodeMapping
+
+        client = None
+        if settings.PROXMOX_ENABLED and settings.PROXMOX_DELETE_ON_EXPIRY:
+            try:
+                client = ProxmoxClient()
+            except Exception as e:
+                logger.error("[POL-RESSOURCES-01] Impossible d'initialiser ProxmoxClient pour suppression auto: %s", e)
+
         for vm in vms_expired:
             vm.status = VMStatus.EXPIRED
             vm.stopped_at = now
@@ -63,7 +74,39 @@ def task_expire_vms():
                 vm.id,
                 metadata={"auto": True, "lease_end": vm.lease_end.isoformat()},
             )
+
             logger.info("[POL-RESSOURCES-01] VM %s expirée", vm.id)
+
+            # Attempt immediate deletion if configured and Proxmox client is available
+            if client and client.enabled:
+                try:
+                    mapping = db.query(ProxmoxNodeMapping).filter(
+                        ProxmoxNodeMapping.physical_node == vm.node
+                    ).first()
+                    px_node = mapping.proxmox_node_name if mapping else vm.node
+                    # Delete on Proxmox
+                    try:
+                        # call proxmox delete (purge)
+                        import asyncio as _asyncio
+
+                        # Run the async delete in a fresh loop
+                        _asyncio.run(client.delete_vm(px_node, vm.proxmox_vmid))
+                        # Log and remove DB entry
+                        log_action(
+                            db,
+                            None,
+                            AuditAction.VM_DELETED,
+                            "vm",
+                            vm.id,
+                            metadata={"auto": True, "reason": "expired_and_auto_deleted"},
+                        )
+                        logger.info("[POL-RESSOURCES-01] VM %s supprimée de Proxmox et DB (auto)", vm.id)
+                        db.delete(vm)
+                    except Exception as e:
+                        logger.error("[POL-RESSOURCES-01] Échec suppression Proxmox pour VM %s: %s", vm.id, e)
+                        # keep DB record marked as EXPIRED for later manual or automatic cleanup
+                except Exception as e:
+                    logger.error("[POL-RESSOURCES-01] Erreur en tentant de supprimer VM %s: %s", vm.id, e)
 
         db.commit()
     except Exception as e:

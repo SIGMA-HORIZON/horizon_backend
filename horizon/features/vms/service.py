@@ -6,6 +6,8 @@ from datetime import datetime, timedelta, timezone
 from sqlalchemy import func
 from sqlalchemy.orm import Session
 
+from typing import Any
+from horizon.features.vms import schemas
 from horizon.core.config import get_settings
 from horizon.features.vms.quota_service import count_active_vms, get_effective_quota
 from horizon.shared.audit_service import log_action
@@ -57,6 +59,10 @@ def _build_net0(vlan_id: int | None) -> str:
         return f"{base},tag={vlan_id}"
     return base
 
+def _require_proxmox_enabled() -> None:
+    if not get_settings().PROXMOX_ENABLED:
+        raise PolicyError(
+            "PROXMOX", "Proxmox est désactivé (PROXMOX_ENABLED=false).", 503)
 
 async def create_vm(db: Session, owner_id, data: dict) -> VirtualMachine:
     from horizon.infrastructure.proxmox_client import ProxmoxClient, ProxmoxIntegrationError
@@ -134,16 +140,16 @@ async def create_vm(db: Session, owner_id, data: dict) -> VirtualMachine:
     db.add(reservation)
 
     # Gestion des clés SSH
-    user_ssh_key = data.get("ssh_public_key")
+    user_ssh_key = data.get("ssh_public_key", "").strip()
     if user_ssh_key:
+        if not user_ssh_key.startswith(("ssh-rsa", "ssh-ed25519", "ecdsa-sha2")):
+            raise PolicyError("POL-RESSOURCES-02", "La clé SSH fournie n'est pas une clé publique valide.", 422)
         public_key = user_ssh_key
         private_key = None
-        vm.ssh_public_key = None  # Pas de clé privée à télécharger car fournie par l'utilisateur
+        vm.ssh_public_key = None
     else:
-        # Génération d'une paire de clés SSH spécifique à cette VM
         private_key, public_key = generate_ssh_key_pair()
-        vm.ssh_public_key = private_key  # Stockée temporairement pour le téléchargement unique
-
+        vm.ssh_public_key = private_key  # store private key for one-time download
     try:
         db.flush()
 
@@ -167,6 +173,11 @@ async def create_vm(db: Session, owner_id, data: dict) -> VirtualMachine:
             memory_mb = max(1, int(round(float(data["ram_gb"]) * 1024)))
             net0 = _build_net0(vlan_id)
             try:
+                # Normalize ssh public key (keep only type + blob) to avoid Proxmox validation issues
+                if public_key:
+                    pk_parts = public_key.strip().split()
+                    public_key = f"{pk_parts[0]} {pk_parts[1]}" if len(pk_parts) >= 2 else public_key.strip()
+
                 res = await client.create_vm_from_template(
                     px_node,
                     tpl.proxmox_template_vmid,
@@ -209,6 +220,104 @@ async def create_vm(db: Session, owner_id, data: dict) -> VirtualMachine:
         db.rollback()
         raise
 
+async def create_vm_directly(db: Session, owner_id, body: schemas.ProxmoxCreateVMRequest) -> dict[str, Any]:
+    from horizon.infrastructure.proxmox_client import ProxmoxClient, ProxmoxIntegrationError
+    from datetime import datetime, timezone, timedelta
+    from horizon.shared.models import VirtualMachine, Reservation, ISOImage, ProxmoxNodeMapping
+    from horizon.shared.models.virtual_machine import PhysicalNode, VMStatus
+    import uuid as _uuid
+
+    _require_proxmox_enabled()
+
+    
+
+    now = datetime.now(timezone.utc)
+
+    # Resolve physical node
+    mapping = db.query(ProxmoxNodeMapping).filter(
+        ProxmoxNodeMapping.proxmox_node_name == body.node
+    ).first()
+    physical_node = mapping.physical_node if mapping else PhysicalNode.REM
+
+    # Try to link ISO by filename
+    iso = db.query(ISOImage).filter(ISOImage.filename == body.iso_filename).first()
+    iso_id = iso.id if iso else None
+
+    # Stage the VM record before touching Proxmox
+    vm = VirtualMachine(
+        id=_uuid.uuid4(),
+        proxmox_vmid=body.vmid,
+        name=body.name,
+        description=None,
+        owner_id=owner_id,
+        node=physical_node,
+        vcpu=body.vcpu,
+        ram_gb=round(float(body.ram_mb) / 1024.0, 3),
+        storage_gb=body.storage_gb,
+        iso_image_id=iso_id,
+        status=VMStatus.PENDING,
+        lease_start=now,
+        lease_end=now + timedelta(hours=body.session_hours),
+        vlan_id=None,
+        ip_address=None,
+        ssh_public_key=body.ssh_public_key,
+        shared_space_gb=0.0,
+    )
+    db.add(vm)
+
+    reservation = Reservation(
+        id=_uuid.uuid4(),
+        vm_id=vm.id,
+        user_id=owner_id,
+        start_time=vm.lease_start,
+        end_time=vm.lease_end,
+    )
+    db.add(reservation)
+
+    try:
+        db.flush()  # Validate constraints before hitting Proxmox
+
+        try:
+            client = ProxmoxClient()
+        except ProxmoxIntegrationError as e:
+            raise PolicyError("PROXMOX", e.message, e.status_code) from e
+
+        try:
+            res = await client.create_vm(
+                node=body.node,
+                vmid=body.vmid,
+                name=body.name,
+                storage=body.storage,
+                iso_filename=body.iso_filename,
+                vcpu=body.vcpu,
+                ram_mb=body.ram_mb,
+                storage_gb=body.storage_gb,
+                iso_storage=body.iso_storage,
+                net0=body.net0,
+                ssh_key=body.ssh_public_key,
+            )
+            await client.start_vm(node=body.node, vmid=body.vmid)
+        except ProxmoxIntegrationError as e:
+            raise PolicyError("PROXMOX", e.message, e.status_code) from e
+
+        vm.status = VMStatus.ACTIVE
+        db.commit()
+        db.refresh(vm)
+
+        return {
+            "proxmox": res,
+            "vm": {
+                "id": str(vm.id),
+                "proxmox_vmid": vm.proxmox_vmid,
+                "name": vm.name,
+            },
+        }
+    except PolicyError:
+        db.rollback()
+        raise
+    except Exception:
+        db.rollback()
+        raise
 
 async def stop_vm(db: Session, vm_id, requesting_user_id, user_role: str, force: bool = False) -> None:
     from horizon.infrastructure.proxmox_client import ProxmoxClient, ProxmoxIntegrationError
@@ -442,7 +551,7 @@ def _next_proxmox_vmid(db: Session) -> int:
             client = ProxmoxClient()
             if client.enabled:
                 # Vérifier tous les IDs réservés sur le cluster Proxmox
-                resources = client._api.cluster.resources.get(type="vm")
+                resources = client.api.cluster.resources.get(type="vm")
                 taken_proxmox_ids = {r["vmid"] for r in resources}
                 
                 while candidate in taken_proxmox_ids:

@@ -34,6 +34,21 @@ class VMCreateRequest(BaseModel):
             raise ValueError("La valeur doit être positive")
         return v
 
+class ProxmoxCreateVMRequest(BaseModel):
+    vmid: int = Field(..., ge=100)
+    node: str
+    storage: str = "local-lvm"
+    iso_storage: str | None = Field(default=None)
+    iso_filename: str
+    name: str
+    vcpu: int = 1
+    ram_mb: int = 1024
+    storage_gb: int = 10
+    net0: str = "virtio,bridge=vmbr0"
+    owner_id: str | None = None
+    ssh_public_key: str | None = None
+    session_hours: int = 24
+
 
 class VMUpdateRequest(BaseModel):
     name: str | None = None

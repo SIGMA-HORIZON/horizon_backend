@@ -247,8 +247,7 @@ class ProxmoxClient:
         storage_gb: int,
         iso_storage: str | None = None,
         net0: str = "virtio,bridge=vmbr0",
-        agent: int = 1,
-        ssh_key: str | None = None,
+        agent: int = 1
     ) -> dict[str, Any]:
         """Crée une VM directement à partir d'un ISO (sans template)."""
         try:
@@ -264,7 +263,6 @@ class ProxmoxClient:
                 "net0": net0,
                 "ide2": f"{iso_path_storage}:iso/{iso_filename},media=cdrom",
                 "scsi0": f"{storage}:{storage_gb}",
-                "boot": "order=ide2;scsi0",
                 "ostype": "l26",
                 "agent": agent,
             }
@@ -272,30 +270,7 @@ class ProxmoxClient:
             raw_upid = n.qemu.post(**params)
             upid = self._extract_upid(raw_upid)
             await self.wait_for_task(node, upid)
-
-            # SSH key injection — same mechanism as create_vm_from_template
-            config_params: dict[str, Any] = {"agent": "1"}
-            if ssh_key:
-                parts = ssh_key.strip().split()
-                clean_key = f"{parts[0]} {parts[1]}" if len(parts) >= 2 else ssh_key.strip()
-                config_params["sshkeys"] = clean_key
-
-            host = self._settings.PROXMOX_HOST
-            port = self._settings.PROXMOX_PORT
-            host_str = f"{host}:{port}" if port else host
-            url = f"https://{host_str}/api2/json/nodes/{node}/qemu/{vmid}/config"
-            headers = {
-                "Authorization": f"PVEAPIToken={self._settings.PROXMOX_USER}!{self._settings.PROXMOX_TOKEN_NAME}={self._settings.PROXMOX_TOKEN_VALUE}",
-                "Content-Type": "application/x-www-form-urlencoded",
-            }
-            body = urllib.parse.urlencode(config_params)
-            resp = requests.post(url, headers=headers, data=body, verify=self._settings.PROXMOX_VERIFY_SSL)
-            if resp.status_code >= 400:
-                raise ProxmoxIntegrationError(
-                    f"{resp.status_code} config error: {resp.text}", resp.status_code
-                )
-
-            return {"status": "success", "message": f"VM {name} ({vmid}) créée depuis ISO.", "vmid": vmid}
+            return {"status": "success", "message": f"VM {name} ({vmid}) créée sur {node} depuis ISO.", "vmid": vmid}
         except Exception as e:
             logger.exception(f"Erreur lors de la création de la VM {vmid} depuis ISO")
             if isinstance(e, ProxmoxIntegrationError):

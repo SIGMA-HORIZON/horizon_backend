@@ -265,4 +265,7 @@ class ProxmoxCreateVMRequest(BaseModel):
     ram_mb: int = 1024
     storage_gb: int = 10
     net0: str = "virtio,bridge=vmbr0"
+    owner_id: str | None = None
+    ssh_public_key: str | None = None
+    session_hours: int = 24
 

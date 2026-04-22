@@ -81,6 +81,8 @@ class Settings(BaseSettings):
     PROXMOX_NET0_TEMPLATE: str = "virtio,bridge=vmbr0"
     PROXMOX_VLAN_ISOLATION: bool = True
     PROXMOX_TIMEOUT: int = 120
+    # If true, Horizon will attempt to delete VMs from Proxmox and the DB immediately when they expire
+    PROXMOX_DELETE_ON_EXPIRY: bool = True
 
 
 @lru_cache
