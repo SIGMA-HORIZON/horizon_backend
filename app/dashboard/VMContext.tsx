@@ -1,7 +1,7 @@
 "use client";
 
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
-import { vmService } from '../../services/vms';
+import { vmService } from '@/services/vms';
 import { useAuth } from '../../context/AuthContext';
 
 export interface VM {
@@ -16,6 +16,7 @@ export interface VM {
   lease_start: string;
   lease_end: string;
   ip_address?: string;
+  ssh_public_key?: string;
   // UI helpers (calculated or mocked)
   cpu_usage?: number;
   ram_usage?: number;
@@ -36,10 +37,15 @@ interface VMContextType {
   vms: VM[];
   loading: boolean;
   reservations: Reservation[];
+  clusterStatus: any;
   refreshVMs: () => Promise<void>;
+  refreshClusterStatus: () => Promise<void>;
   addVM: (data: any) => Promise<any>;
   deleteVM: (vmid: string) => Promise<void>;
+  startVM: (vmid: string) => Promise<void>;
   stopVM: (vmid: string) => Promise<void>;
+  rebootVM: (vmid: string) => Promise<void>;
+  pauseVM: (vmid: string) => Promise<void>;
   extendVM: (vmid: string, hours: number) => Promise<void>;
   updateVM: (vmid: string, data: any) => Promise<void>;
 }
@@ -57,13 +63,13 @@ export const VMProvider = ({ children }: { children: React.ReactNode }) => {
   const [vms, setVMs] = useState<VM[]>([]);
   const [loading, setLoading] = useState(false);
   const [reservations, setReservations] = useState<Reservation[]>([]);
+  const [clusterStatus, setClusterStatus] = useState<any>(null);
 
   const refreshVMs = useCallback(async () => {
     if (!user) return;
     setLoading(true);
     try {
       const data = await vmService.listVms();
-      // Map API data to our expected UI format if needed
       setVMs(data.items || []);
     } catch (error) {
       console.error("Failed to fetch VMs:", error);
@@ -72,9 +78,24 @@ export const VMProvider = ({ children }: { children: React.ReactNode }) => {
     }
   }, [user]);
 
+  const refreshClusterStatus = useCallback(async () => {
+    if (!user) return;
+    try {
+      const data = await vmService.getClusterStatus();
+      setClusterStatus(data);
+    } catch (error) {
+      console.error("Failed to fetch cluster status:", error);
+    }
+  }, [user]);
+
   useEffect(() => {
     refreshVMs();
-  }, [refreshVMs]);
+    refreshClusterStatus();
+    
+    // Interval pour le statut du cluster (toutes les 30s)
+    const interval = setInterval(refreshClusterStatus, 30000);
+    return () => clearInterval(interval);
+  }, [refreshVMs, refreshClusterStatus]);
 
   const addVM = async (data: any) => {
     const newVM = await vmService.createVm(data);
@@ -87,8 +108,23 @@ export const VMProvider = ({ children }: { children: React.ReactNode }) => {
     await refreshVMs();
   };
 
+  const startVM = async (vmid: string) => {
+    await vmService.startVm(vmid);
+    await refreshVMs();
+  };
+
   const stopVM = async (vmid: string) => {
     await vmService.stopVm(vmid);
+    await refreshVMs();
+  };
+
+  const rebootVM = async (vmid: string) => {
+    await vmService.rebootVm(vmid);
+    await refreshVMs();
+  };
+
+  const pauseVM = async (vmid: string) => {
+    await vmService.pauseVm(vmid);
     await refreshVMs();
   };
 
@@ -98,7 +134,6 @@ export const VMProvider = ({ children }: { children: React.ReactNode }) => {
   };
 
   const updateVM = async (vmid: string, data: any) => {
-    // Mapping frontend fields to backend if necessary
     const backendData: any = {};
     if (data.cpu !== undefined) backendData.vcpu = data.cpu;
     if (data.ram) backendData.ram_gb = parseFloat(data.ram);
@@ -113,10 +148,15 @@ export const VMProvider = ({ children }: { children: React.ReactNode }) => {
       vms,
       loading,
       reservations,
+      clusterStatus,
       refreshVMs,
+      refreshClusterStatus,
       addVM,
       deleteVM,
+      startVM,
       stopVM,
+      rebootVM,
+      pauseVM,
       extendVM,
       updateVM
     }}>

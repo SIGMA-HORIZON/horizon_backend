@@ -7,6 +7,7 @@ import { VMProvider, useVMs } from './VMContext';
 import './dashboard.css';
 import '../home.css';
 import CreateVMModal from './CreateVMModal';
+import { Icon } from '@/components/Icon';
 
 function SearchComponent({ vms, router }: { vms: any[], router: any }) {
   const [query, setQuery] = useState('');
@@ -20,7 +21,7 @@ function SearchComponent({ vms, router }: { vms: any[], router: any }) {
 
   return (
     <div className="search-box" style={{ position: 'relative', width: '300px', cursor: 'text' }}>
-      <svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="8" /><path d="m21 21-4.35-4.35" /></svg>
+      <Icon name="search" size={16} />
       <input
         type="text"
         placeholder="Rechercher une VM…"
@@ -81,18 +82,18 @@ function DashboardLayoutInner({ children }: { children: React.ReactNode }) {
 
           <div className="logo-wrap">
             <div className="logo-mark">
-              <div className="logo-box"><svg viewBox="0 0 24 24"><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5" /></svg></div>
+              <div className="logo-box"><Icon name="logo" strokeWidth={2.5} /></div>
               <div><div className="logo-name">Horizon</div><div className="logo-sub">Espace utilisateur</div></div>
             </div>
           </div>
           <div className="nav-wrap">
             <div className="nav-group">
               <div className="nav-group-label">Navigation</div>
-              <Link href="/dashboard" className={`nav-item ${pathname === '/dashboard' ? 'active' : ''}`}><svg viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7" rx="1" /><rect x="14" y="3" width="7" height="7" rx="1" /><rect x="3" y="14" width="7" height="7" rx="1" /><rect x="14" y="14" width="7" height="7" rx="1" /></svg>Dashboard</Link>
+              <Link href="/dashboard" className={`nav-item ${pathname === '/dashboard' ? 'active' : ''}`}><Icon name="dashboard" /> Dashboard</Link>
             </div>
             <div className="nav-group">
               <div className="nav-group-label">Mes machines virtuelles</div>
-              <Link href="/dashboard/mes-vms" className={`nav-item ${pathname === '/dashboard/mes-vms' ? 'active' : ''}`}><svg viewBox="0 0 24 24"><rect x="2" y="4" width="20" height="16" rx="2" /><path d="M8 4v16M16 4v16" /></svg>Mes VMs
+              <Link href="/dashboard/mes-vms" className={`nav-item ${pathname === '/dashboard/mes-vms' ? 'active' : ''}`}><Icon name="vms" /> Mes VMs
                 <span style={{ marginLeft: 'auto', background: 'rgba(37,99,235,.25)', color: '#93C5FD', fontSize: '9px', fontWeight: '700', padding: '1px 6px', borderRadius: '10px' }}>{vms.length}</span>
               </Link>
               <div className="nav-vm-list">
@@ -104,19 +105,19 @@ function DashboardLayoutInner({ children }: { children: React.ReactNode }) {
                   </Link>
                 ))}
                 <div className="vm-tree-item" style={{ color: 'var(--g1-accent2)', fontWeight: 600, cursor: 'pointer' }} onClick={() => setIsModalOpen(true)}>
-                  <svg viewBox="0 0 24 24" width="14" height="14" stroke="currentColor" strokeWidth="2.5" fill="none"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
+                  <Icon name="start" size={14} strokeWidth={2.5} style={{ transform: 'rotate(90deg)' }} />
                   Créer une VM
                 </div>
               </div>
             </div>
             <div className="nav-group">
               <div className="nav-group-label">Gestion</div>
-              <Link href="/dashboard/reservations" className={`nav-item ${pathname === '/dashboard/reservations' ? 'active' : ''}`}><svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="18" rx="2" /><path d="M16 2v4M8 2v4M3 10h18" /></svg>Réservations</Link>
-              <Link href="/dashboard/ssh" className={`nav-item ${pathname === '/dashboard/ssh' ? 'active' : ''}`}><svg viewBox="0 0 24 24"><rect x="2" y="4" width="20" height="16" rx="2" /><path d="M8 12l2 2 4-4" /></svg>Clés SSH</Link>
+              <Link href="/dashboard/reservations" className={`nav-item ${pathname === '/dashboard/reservations' ? 'active' : ''}`}><Icon name="reservations" /> Réservations</Link>
+              <Link href="/dashboard/ssh" className={`nav-item ${pathname === '/dashboard/ssh' ? 'active' : ''}`}><Icon name="ssh" /> Clés SSH</Link>
             </div>
             <div className="nav-group">
               <div className="nav-group-label">Compte</div>
-              <Link href="/dashboard/profil" className="nav-item"><svg viewBox="0 0 24 24"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" /><circle cx="12" cy="7" r="4" /></svg>Mon Profil</Link>
+              <Link href="/dashboard/profil" className="nav-item"><Icon name="user" /> Mon Profil</Link>
             </div>
           </div>
           <div className="sidebar-footer">
@@ -126,10 +127,10 @@ function DashboardLayoutInner({ children }: { children: React.ReactNode }) {
                 <div className="user-name">{user?.first_name} {user?.last_name || 'Utilisateur'}</div>
                 <div className="user-role">{user?.role?.toUpperCase()}</div>
               </div>
-              <div className="user-row-chevron"><svg viewBox="0 0 24 24"><path d="M9 18l6-6-6-6" /></svg></div>
+              <div className="user-row-chevron"><Icon name="chevronRight" size={16} /></div>
             </div>
             <button className="logout-btn" onClick={handleLogout}>
-              <svg viewBox="0 0 24 24"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" /><polyline points="16 17 21 12 16 7" /><line x1="21" y1="12" x2="9" y2="12" /></svg>
+              <Icon name="logout" size={16} />
               Déconnexion
             </button>
           </div>

@@ -128,7 +128,7 @@ const subtitleStyle: React.CSSProperties = { fontSize: '14px', color: 'var(--g1-
 const closeBtnStyle: React.CSSProperties = { background: 'none', border: 'none', color: 'var(--g1-muted)', cursor: 'pointer', padding: '4px', marginTop: '-4px', marginRight: '-8px' };
 const formStyle: React.CSSProperties = { padding: '24px 32px' };
 const formGroupStyle: React.CSSProperties = { marginBottom: '20px', display: 'flex', flexDirection: 'column' };
-const labelStyle: React.CSSProperties = { fontSize: '12px', fontWeight: 600, color: 'var(--g1-muted)', marginBttom: '8px', textTransform: 'uppercase', letterSpacing: '0.8px' };
+const labelStyle: React.CSSProperties = { fontSize: '12px', fontWeight: 600, color: 'var(--g1-muted)', marginBottom: '8px', textTransform: 'uppercase', letterSpacing: '0.8px' };
 const inputStyle: React.CSSProperties = {
   padding: '12px 14px', fontSize: '14px', color: 'var(--g1-text)',
   border: '1px solid var(--g1-border)', borderRadius: '8px', outline: 'none', fontFamily: 'inherit', width: '100%',

@@ -12,7 +12,7 @@ export default function Profil() {
   // Stats calculées
   const activeVMs = vms.filter(v => v.status === 'on' || v.status === 'warn').length;
   const totalVMs = vms.length;
-  const totalStorage = vms.reduce((acc, v) => acc + parseFloat(v.storage || '0'), 0);
+  const totalStorage = vms.reduce((acc, v) => acc + (v.storage_gb || 0), 0);
 
   // Date d'adhésion
   const memberSince = user?.created_at

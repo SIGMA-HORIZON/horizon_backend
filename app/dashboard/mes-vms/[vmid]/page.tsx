@@ -2,185 +2,224 @@
 import { useParams, useRouter } from 'next/navigation';
 import { useState } from 'react';
 import { useVMs } from '../../VMContext';
+import { vmService } from '@/services/vms';
+import { Icon } from '@/components/Icon';
 
 export default function VMDetails() {
   const params = useParams();
   const router = useRouter();
   const vmid = params.vmid as string;
-  const { vms, deleteVM, updateVM } = useVMs();
+  const { vms, deleteVM, updateVM, startVM, stopVM, rebootVM, refreshVMs } = useVMs();
 
   const [editingField, setEditingField] = useState<string | null>(null);
   const [editValue, setEditValue] = useState<string>('');
 
   const vm = vms.find(v => v.id === vmid);
 
-  if (!vm) {
-    return (
-      <div className="page active" style={{ padding: '20px' }}>
-        <h2 style={{ fontSize: '24px', fontWeight: 'bold', marginBottom: '20px' }}>VM introuvable</h2>
-        <p>La machine virtuelle avec l'identifiant {vmid} n'existe pas ou a été supprimée.</p>
-        <button className="btn-ghost" onClick={() => router.push('/dashboard/mes-vms')} style={{ marginTop: '20px' }}>Retour</button>
-      </div>
-    );
-  }
+  if (!vm) return <VMNotFound vmid={vmid} onBack={() => router.push('/dashboard/mes-vms')} />;
 
-  const handleDelete = () => {
-    if (confirm(`Êtes-vous sûr de vouloir supprimer la VM ${vm.name} ?`)) {
-      deleteVM(vm.id);
-      router.push('/dashboard/mes-vms');
-    }
-  };
+  const isRunning = ['ACTIVE', 'running', 'on'].includes(vm.status);
 
-  const startEdit = (field: string, currentValue: string | number) => {
+  const handleEdit = (field: string, val: any) => {
     setEditingField(field);
-    // Remove " Go" from storage/ram so we can edit it as a number 
-    setEditValue(String(currentValue).replace(' Go', ''));
+    setEditValue(String(val));
   };
 
   const saveEdit = () => {
     if (!editingField || !editValue) return;
-
-    if (editingField === 'cpu') {
-      updateVM(vm.id, { cpu: Number(editValue) });
-    } else if (editingField === 'ram') {
-      updateVM(vm.id, { ram: `${editValue} Go` });
-    } else if (editingField === 'storage') {
-      updateVM(vm.id, { storage: `${editValue} Go` });
-    } else if (editingField === 'name') {
-      updateVM(vm.id, { name: editValue });
-    }
-
+    const payload: any = { [editingField]: editingField === 'name' ? editValue : Number(editValue) };
+    updateVM(vm.id, payload);
     setEditingField(null);
   };
 
-  const tableHeaderStyle = { padding: '12px 16px', borderBottom: '1px solid #E2E8F0', textAlign: 'left' as const, color: '#64748B', fontWeight: 600, fontSize: '12px' };
-  const tableDataStyle = { padding: '12px 16px', borderBottom: '1px solid #E2E8F0', fontSize: '14px', color: '#1E293B' };
-
-  const editIcon = (
-    <svg viewBox="0 0 24 24" width="14" height="14" stroke="currentColor" strokeWidth="2" fill="none" strokeLinecap="round" strokeLinejoin="round" style={{ marginRight: '6px', verticalAlign: 'middle', marginTop: '-2px' }}>
-      <path d="M12 20h9"></path>
-      <path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"></path>
-    </svg>
-  );
+  const downloadKey = async () => {
+    try {
+      const data = await vmService.getSshKey(vm.id);
+      const blob = new Blob([data.ssh_public_key], { type: 'text/plain' });
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `horizon-${vm.name}.pub`;
+      document.body.appendChild(a);
+      a.click();
+      window.URL.revokeObjectURL(url);
+      document.body.removeChild(a);
+      alert("Clé SSH téléchargée avec succès. Elle a été supprimée du serveur.");
+      refreshVMs();
+    } catch (error: any) {
+      alert(error.response?.data?.detail || "Erreur lors du téléchargement.");
+    }
+  };
 
   return (
-    <div className="page active" style={{ padding: '20px' }}>
-      <h2 style={{ fontSize: '24px', fontWeight: 'bold', marginBottom: '20px' }}>Détails de la VM : {vm.name}</h2>
-
-      <div className="vm-panel" id="myvms-vm-panel">
-        <div className="vm-panel-hdr" style={{ borderBottom: 'none', paddingBottom: '0' }}>
-          <div>
-            <div className="vm-panel-title">{vm.name}</div>
-            <div className="vm-panel-meta">VMID {vm.proxmox_vmid} · LINUX · <span style={{ color: vm.status === 'running' ? 'var(--g1-on)' : '#94A3B8', fontWeight: 600 }}>{vm.status.toUpperCase()}</span></div>
+    <div className="page active vm-details-layout">
+      {/* 1. HERO SECTION */}
+      <div className="vm-hero">
+        <div className="vm-hero-left">
+          <div className="vm-hero-icon">
+            <Icon name="vms" size={24} />
           </div>
-          <div className="vm-actions">
-            <button className="btn-vm btn-vm-console">
-              <svg viewBox="0 0 24 24"><rect x="2" y="3" width="20" height="14" rx="2" /><path d="M8 21h8M12 17v4" /></svg>Console
-            </button>
-            <button className="btn-vm btn-vm-stop" disabled={vm.status !== 'running'}>
-              <svg viewBox="0 0 24 24"><rect x="6" y="4" width="4" height="16" /><rect x="14" y="4" width="4" height="16" /></svg>Stop
-            </button>
-            <button className="btn-vm">
-              <svg viewBox="0 0 24 24"><path d="M1 4v6h6M23 20v-6h-6" /><path d="M20.49 9A9 9 0 0 0 5.64 5.64L1 10M23 14l-4.64 4.36A9 9 0 0 1 3.51 15" /></svg>Redémarrer
-            </button>
-            <button className="btn-vm" onClick={handleDelete} style={{ color: '#ef4444', borderColor: 'rgba(239,68,68,0.3)', background: 'rgba(239,68,68,0.05)' }}>
-              <svg viewBox="0 0 24 24" stroke="currentColor" fill="none" strokeWidth="2"><path d="M3 6h18M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2M10 11v6M14 11v6" /></svg>Supprimer
-            </button>
+          <div className="vm-hero-info">
+            <h1>{vm.name}</h1>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginTop: '4px' }}>
+              <span className={`badge ${isRunning ? 'badge-on' : 'badge-off'}`}>
+                {isRunning ? '● EN LIGNE' : '○ HORS LIGNE'}
+              </span>
+              <span style={{ color: 'var(--g1-muted)', fontSize: '13px' }}>ID: {vm.proxmox_vmid}</span>
+            </div>
           </div>
         </div>
 
-        <div style={{ padding: '0 20px 20px' }}>
-          <table style={{ width: '100%', borderCollapse: 'collapse', marginTop: '20px', background: 'rgba(255,255,255,0.02)', borderRadius: '8px', overflow: 'hidden', border: '1px solid var(--g1-border)' }}>
-            <thead>
-              <tr style={{ background: 'rgba(255,255,255,0.03)' }}>
-                <th style={tableHeaderStyle}>Paramètre</th>
-                <th style={tableHeaderStyle}>Valeur Actuelle</th>
-                <th style={tableHeaderStyle}>Action</th>
-              </tr>
-            </thead>
-            <tbody>
-              {/* Nom */}
-              <tr>
-                <td style={tableDataStyle}><b>Nom de la VM</b></td>
-                <td style={tableDataStyle}>
-                  {editingField === 'name' ? (
-                    <input type="text" value={editValue} onChange={e => setEditValue(e.target.value)} style={{ padding: '6px 10px', background: 'rgba(0,0,0,0.2)', border: '1px solid var(--g1-border)', borderRadius: '4px', color: 'white' }} />
-                  ) : vm.name}
-                </td>
-                <td style={tableDataStyle}>
-                  {editingField === 'name' ? (
-                    <button className="btn-accent" style={{ padding: '4px 12px', fontSize: '11px' }} onClick={saveEdit}>Sauvegarder</button>
-                  ) : (
-                    <button className="btn-ghost" style={{ padding: '4px 12px', fontSize: '11px' }} onClick={() => startEdit('name', vm.name)}>{editIcon}Modifier</button>
-                  )}
-                </td>
-              </tr>
-              {/* CPU */}
-              <tr>
-                <td style={tableDataStyle}><b>vCPU</b></td>
-                <td style={tableDataStyle}>
-                  {editingField === 'cpu' ? (
-                    <input type="number" value={editValue} onChange={e => setEditValue(e.target.value)} style={{ padding: '6px 10px', background: 'rgba(0,0,0,0.2)', border: '1px solid var(--g1-border)', borderRadius: '4px', width: '80px', color: 'white' }} />
-                  ) : `${vm.vcpu} Cores`}
-                  <span style={{ marginLeft: '10px', fontSize: '11px', color: 'var(--g1-muted)' }}>(Usage: {vm.cpu_usage || 0}%)</span>
-                </td>
-                <td style={tableDataStyle}>
-                  {editingField === 'cpu' ? (
-                    <button className="btn-accent" style={{ padding: '4px 12px', fontSize: '11px' }} onClick={saveEdit}>Sauvegarder</button>
-                  ) : (
-                    <button className="btn-ghost" style={{ padding: '4px 12px', fontSize: '11px' }} onClick={() => startEdit('cpu', vm.vcpu)}>{editIcon}Modifier</button>
-                  )}
-                </td>
-              </tr>
-              {/* RAM */}
-              <tr>
-                <td style={tableDataStyle}><b>Mémoire RAM</b></td>
-                <td style={tableDataStyle}>
-                  {editingField === 'ram' ? (
-                    <div style={{ display: 'inline-flex', alignItems: 'center', gap: '8px' }}>
-                      <input type="number" value={editValue} onChange={e => setEditValue(e.target.value)} style={{ padding: '6px 10px', background: 'rgba(0,0,0,0.2)', border: '1px solid var(--g1-border)', borderRadius: '4px', width: '80px', color: 'white' }} />
-                      <span>Go</span>
-                    </div>
-                  ) : `${vm.ram_gb} Go`}
-                  <span style={{ marginLeft: '10px', fontSize: '11px', color: 'var(--g1-muted)' }}>(Usage: {vm.ram_usage || 0}%)</span>
-                </td>
-                <td style={tableDataStyle}>
-                  {editingField === 'ram' ? (
-                    <button className="btn-accent" style={{ padding: '4px 12px', fontSize: '11px' }} onClick={saveEdit}>Sauvegarder</button>
-                  ) : (
-                    <button className="btn-ghost" style={{ padding: '4px 12px', fontSize: '11px' }} onClick={() => startEdit('ram', vm.ram_gb)}>{editIcon}Modifier</button>
-                  )}
-                </td>
-              </tr>
-              {/* Stockage */}
-              <tr>
-                <td style={tableDataStyle}><b>Espace Disque</b></td>
-                <td style={tableDataStyle}>
-                  {editingField === 'storage' ? (
-                    <div style={{ display: 'inline-flex', alignItems: 'center', gap: '8px' }}>
-                      <input type="number" value={editValue} onChange={e => setEditValue(e.target.value)} style={{ padding: '6px 10px', background: 'rgba(0,0,0,0.2)', border: '1px solid var(--g1-border)', borderRadius: '4px', width: '80px', color: 'white' }} />
-                      <span>Go</span>
-                    </div>
-                  ) : `${vm.storage_gb} Go`}
-                </td>
-                <td style={tableDataStyle}>
-                  {editingField === 'storage' ? (
-                    <button className="btn-accent" style={{ padding: '4px 12px', fontSize: '11px' }} onClick={saveEdit}>Sauvegarder</button>
-                  ) : (
-                    <button className="btn-ghost" style={{ padding: '4px 12px', fontSize: '11px' }} onClick={() => startEdit('storage', vm.storage_gb)}>{editIcon}Modifier</button>
-                  )}
-                </td>
-              </tr>
-              {/* IP */}
-              <tr>
-                <td style={tableDataStyle}><b>Adresse IP</b></td>
-                <td style={tableDataStyle}><code style={{ background: 'rgba(255,255,255,0.05)', padding: '4px 8px', borderRadius: '4px', fontSize: '12px', border: '1px solid var(--g1-border)' }}>{vm.ip_address || 'En attente...'}</code></td>
-                <td style={tableDataStyle}><span style={{ fontSize: '11px', color: 'var(--g1-muted)' }}>Dynamique</span></td>
-              </tr>
-            </tbody>
-          </table>
+        <div className="vm-actions">
+          <button className="btn-accent" onClick={() => router.push(`/dashboard/mes-vms/${vm.id}/console`)}>
+            <Icon name="console" strokeWidth={2.5} />
+            Console VNC
+          </button>
+          
+          <ActionButtons 
+            isRunning={isRunning} 
+            onStart={() => startVM(vm.id)} 
+            onStop={() => stopVM(vm.id)} 
+            onReboot={() => rebootVM(vm.id)} 
+            onDelete={() => {
+              if (confirm("Supprimer cette VM ?")) {
+                deleteVM(vm.id);
+                router.push('/dashboard/mes-vms');
+              }
+            }}
+          />
         </div>
       </div>
+
+      {/* 2. STATS GRID */}
+      <div className="vm-stats-grid">
+        <StatCard label="vCPU" value={`${vm.vcpu} Cores`} usage={vm.cpu_usage} icon="cpu" />
+        <StatCard label="RAM" value={`${vm.ram_gb} Go`} usage={vm.ram_usage} icon="ram" />
+        <StatCard label="Stockage" value={`${vm.storage_gb} Go`} icon="disk" />
+        <StatCard label="IP" value={vm.ip_address || 'Allocation...'} icon="network" />
+      </div>
+
+      {/* 3. DETAILS & SSH */}
+      <div className="details-section">
+        <div className="details-card">
+          <div className="details-card-header">
+            <Icon name="info" size={18} />
+            Paramètres système
+          </div>
+          <div className="details-card-body">
+            <EditableRow label="Nom de la machine" value={vm.name} field="name" editingField={editingField} editValue={editValue} onEdit={handleEdit} onSave={saveEdit} onChange={setEditValue} />
+            <div className="detail-row"><span className="detail-label">OS</span><span className="detail-value">Ubuntu 22.04 LTS</span></div>
+            <EditableRow label="vCPU" value={`${vm.vcpu} Cores`} field="cpu" editingField={editingField} editValue={editValue} onEdit={handleEdit} onSave={saveEdit} onChange={setEditValue} type="number" />
+            <EditableRow label="RAM" value={`${vm.ram_gb} Go`} field="ram" editingField={editingField} editValue={editValue} onEdit={handleEdit} onSave={saveEdit} onChange={setEditValue} type="number" />
+            <div className="detail-row"><span className="detail-label">Créée le</span><span className="detail-value">{new Date(vm.lease_start).toLocaleDateString()}</span></div>
+          </div>
+        </div>
+
+        <SSHCard ip={vm.ip_address} hasKey={!!vm.ssh_public_key} onDownload={downloadKey} />
+      </div>
     </div>
-  )
+  );
+}
+
+// SUB-COMPONENTS
+function VMNotFound({ vmid, onBack }: any) {
+  return (
+    <div className="page active" style={{ padding: '40px' }}>
+      <div className="vm-panel" style={{ padding: '40px', textAlign: 'center' }}>
+        <h2 style={{ color: '#fff' }}>VM introuvable</h2>
+        <p style={{ color: 'var(--g1-muted)', margin: '12px 0 24px' }}>L'identifiant {vmid} est incorrect.</p>
+        <button className="btn-accent" onClick={onBack}>Retour à la liste</button>
+      </div>
+    </div>
+  );
+}
+
+function StatCard({ label, value, usage, icon }: any) {
+  return (
+    <div className="stat-card">
+      <div className="stat-card-label"><Icon name={icon} size={14} /> {label}</div>
+      <div className="stat-card-value">{value}</div>
+      {usage !== undefined && (
+        <>
+          <div className="stat-card-footer">Usage: {usage}%</div>
+          <div className="usage-bar">
+            <div className="usage-fill" style={{ width: `${usage}%`, background: usage > 80 ? 'var(--g1-err)' : 'var(--g1-accent2)' }}></div>
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
+
+function EditableRow({ label, value, field, editingField, editValue, onEdit, onSave, onChange, type = "text" }: any) {
+  const isEditing = editingField === field;
+  return (
+    <div className="detail-row">
+      <div className="detail-label">{label}</div>
+      <div className="detail-value">
+        {isEditing ? (
+          <input 
+            className="pm-input" 
+            type={type} 
+            style={{ padding: '4px 8px', width: '120px', height: '28px' }} 
+            value={editValue} 
+            onChange={e => onChange(e.target.value)} 
+            onBlur={onSave} 
+            autoFocus 
+          />
+        ) : (
+          <span onClick={() => onEdit(field, value)} style={{ cursor: 'pointer', borderBottom: '1px dashed rgba(255,255,255,0.2)' }}>{value}</span>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function SSHCard({ ip, hasKey, onDownload }: any) {
+  return (
+    <div className="details-card" style={{ borderTopColor: 'var(--g1-accent2)' }}>
+      <div className="details-card-header">
+        <Icon name="lock" size={18} />
+        Accès SSH
+      </div>
+      <div className="pm-body">
+        <p style={{ fontSize: '13px', color: 'var(--g1-muted)', marginBottom: '12px' }}>Connectez-vous via terminal :</p>
+        <code style={{ display: 'block', background: '#030610', padding: '12px', borderRadius: '8px', border: '1px solid var(--g1-border)', color: 'var(--g1-accent)', fontSize: '12px' }}>
+          ssh ubuntu@{ip || 'IP'}
+        </code>
+        {hasKey ? (
+          <button className="btn-primary" style={{ width: '100%', marginTop: '16px' }} onClick={onDownload}>
+            <Icon name="download" />
+            Télécharger la clé (.pub)
+          </button>
+        ) : (
+          <div className="pm-alert pm-alert-warn" style={{ marginTop: '16px' }}>
+            <p>Clé déjà téléchargée.</p>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function ActionButtons({ isRunning, onStart, onStop, onReboot, onDelete }: any) {
+  return (
+    <>
+      {isRunning ? (
+        <button className="btn-vm btn-vm-stop" onClick={onStop}>
+          <Icon name="stop" />Arrêter
+        </button>
+      ) : (
+        <button className="btn-vm btn-vm-start" onClick={onStart}>
+          <Icon name="start" />Démarrer
+        </button>
+      )}
+      <button className="btn-vm" onClick={onReboot}>
+        <Icon name="reboot" />Reboot
+      </button>
+      <button className="btn-vm" style={{ color: 'var(--g1-err)' }} onClick={onDelete}>
+        <Icon name="delete" />Delete
+      </button>
+    </>
+  );
 }

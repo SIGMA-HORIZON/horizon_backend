@@ -2,7 +2,7 @@
 import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useVMs } from './VMContext';
-import { vmService } from '../../services/vms';
+import { vmService } from '@/services/vms';
 
 interface CreateVMModalProps {
   isOpen: boolean;
