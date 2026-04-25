@@ -1,139 +1,71 @@
-# 🚀 Horizon Backend - Cloud Management API
+# Horizon — API SIGMA / ENSPY
 
-Bienvenue sur le backend de **Horizon**, une API de gestion de machines virtuelles (VM) performante, sécurisée et scalable, construite avec **FastAPI** et **SQLAlchemy 2.0**.
+Monorepo unique : package Python **`horizon/`** à la racine du dépôt, architecture par fonctionnalités (`features/`), couches `shared/` et `infrastructure/`.
 
----
+## Prérequis
 
-## 🛠 Stack Technique
+- Python 3.11+ (recommandé ; les tests ont été validés avec 3.12 en local)
+- Docker et Docker Compose (pour l’exécution compose et pour **pytest** + Testcontainers)
 
-- **Framework :** [FastAPI](https://fastapi.tiangolo.com/) (Asynchrone)
-- **Base de données :** PostgreSQL avec [SQLAlchemy 2.0](https://www.sqlalchemy.org/) (Mode Async via `asyncpg`)
-- **Validation :** [Pydantic v2](https://docs.pydantic.dev/latest/)
-- **Migrations :** Alembic
-- **Emails :** FastAPI-Mail (SMTP Asynchrone)
-- **Sécurité :** Bcrypt (Passlib) & JWT (Python-jose)
-- **Configuration :** Pydantic-Settings (Gestion via `.env`)
+## Configuration
 
----
+Copier `.env.example` vers `.env` à la racine et ajuster les secrets (`JWT_SECRET_KEY`, `APP_SECRET_KEY`, etc.). Pour Compose, les variables critiques peuvent aussi être surchargées dans `docker-compose.yml`.
 
-## 🏗 Architecture du Projet
+## Démarrage avec Docker
 
-Le projet suit une architecture propre (Clean Architecture) basée sur les patterns **Repository** et **Service** pour garantir une séparation stricte des responsabilités.
+À la racine du dépôt :
 
-```text
-app/
-├── api/
-│   └── v1/
-│       ├── api.py             # Router principal
-│       └── endpoints/         # Routes HTTP (Logique de transport)
-├── core/
-│   └── config.py              # Configuration & Variables d'env
-├── db/
-│   └── base.py                # Session SQLAlchemy & Engine Async
-├── models/
-│   ├── base_models.py         # Modèles SQLAlchemy (Reflet du SQL)
-│   └── enums.py               # Énumérations PostgreSQL
-├── repositories/              # Couche d'accès aux données (SQL pur)
-├── schemas/                   # Schémas Pydantic (Validation & Sérialisation)
-├── services/                  # Logique Métier (Emails, Orchestration)
-├── main.py                    # Point d'entrée de l'application
-├── init_db.py                 # Script de création des tables
-└── seed_admin.py              # Script d'injection d'un administrateur
-```
-
----
-
-## ✨ Fonctionnalités Implémentées
-
-### 1. Demande de création de compte (`POST /auth/register-request`)
-- **Validation stricte :** Utilisation de Pydantic v2 pour valider les entrées (longueur, format email).
-- **Gestion des conflits :** Retourne une erreur `409 Conflict` si l'email existe déjà dans la table `users`.
-- **Logs d'audit :** Chaque tentative est enregistrée dans la table `audit_logs` (avec IP du client, type d'action et succès/échec).
-- **Notifications :** Envoi automatique d'un email HTML professionnel à tous les administrateurs actifs (`role_type = 'admin'`) pour approbation.
-- **Asynchronisme :** Tout le processus (DB et Email) est non-bloquant pour des performances optimales.
-
-### 2. Gestion de la Base de Données
-- Mapping complet du schéma PostgreSQL (Users, Roles, VMs, Policies, Quotas, Nodes, ISOs, etc.).
-- Utilisation des types `ENUM` natifs de PostgreSQL pour la sécurité des données.
-- Contraintes d'intégrité (Check constraints, Foreign Keys avec `ON DELETE CASCADE`).
-
----
-
-## 🚀 Installation et Démarrage
-
-### 1. Cloner et préparer l'environnement
 ```bash
-python3 -m venv venv
-source venv/bin/activate
-pip install -r requirements.txt
+docker compose up --build -d
 ```
 
-### 2. Configuration du fichier `.env`
-Copiez le fichier d'exemple :
+L’API est exposée sur **<http://localhost:8000>** (`/docs`, `/health`). Les migrations Alembic s’exécutent via le service `migrations` avant le démarrage de `api`.
+
+Seed optionnel (profil Compose) :
+
 ```bash
-cp .env.example .env
+docker compose --profile seed run --rm seed
 ```
 
-> ⚠️ **CRITIQUE : CONFIGURATION DE LA BASE DE DONNÉES**
-> 
-> Ouvrez votre fichier `.env` et assurez-vous que les variables suivantes correspondent à votre instance PostgreSQL locale :
-> - **POSTGRES_USER** : Votre utilisateur (ex: `postgres`)
-> - **POSTGRES_PASSWORD** : Votre mot de passe
-> - **POSTGRES_SERVER** : `localhost` ou l'IP du serveur de base de données
-> - **POSTGRES_DB** : Le nom de la base de données (elle doit être **déjà créée** dans Postgres)
+## Migrations (local)
 
----
+Avec Postgres accessible et `DATABASE_URL` défini, depuis la racine du dépôt :
 
-## 📧 Configuration du SMTP (Gmail)
-
-Pour envoyer des emails de notification, vous devez utiliser un **Mot de passe d'application** Google.
-
-### Comment générer un mot de passe d'application Google :
-1. Connectez-vous à votre [Compte Google](https://myaccount.google.com/).
-2. Allez dans la section **Sécurité**.
-3. Activez la **Validation en deux étapes** (si ce n'est pas déjà fait).
-4. Recherchez "Mots de passe d'application" dans la barre de recherche en haut.
-5. Donnez un nom à l'application (ex: `Horizon API`) et cliquez sur **Créer**.
-6. Copiez le code de **16 caractères** affiché dans le cadre jaune.
-7. Collez ce code dans votre fichier `.env` à la ligne `SMTP_PASSWORD`.
-
-**Exemple de configuration SMTP dans `.env` :**
-```env
-SMTP_USER="votre.email@gmail.com"
-SMTP_PASSWORD="abcd efgh ijkl mnop"  # Code de 16 caractères de Google
-SMTP_HOST="smtp.gmail.com"
-SMTP_PORT=587
-SMTP_TLS=True
-EMAILS_FROM_EMAIL="votre.email@gmail.com"
+```bash
+export PYTHONPATH=.
+alembic upgrade head
 ```
 
----
+## Seed (local)
 
-## 🏗 Initialisation et Lancement
+```bash
+export PYTHONPATH=.
+python scripts/seed.py
+```
 
-1. **Créer les tables et les types ENUM :**
-   ```bash
-   python3 app/init_db.py
-   ```
+(`PYTHONPATH=.` place la racine du dépôt sur le chemin d’import pour le package `horizon`.)
 
-2. **Créer l'administrateur par défaut :**
-   *Indispensable pour recevoir les mails de notification.*
-   *Modifiez l'email dans `app/seed_admin.py` avant de lancer :*
-   ```bash
-   python3 app/seed_admin.py
-   ```
+## Proxmox (optionnel)
 
-3. **Lancer le serveur :**
-   ```bash
-   uvicorn app.main:app --reload
-   ```
+L’intégration **proxmoxer** est **désactivée par défaut** (`PROXMOX_ENABLED=false`) : création / arrêt / suppression de VM ne font **aucun appel** au cluster et le comportement reste celui d’Horizon sans Proxmox.
 
----
+Pour l’activer :
 
-## 🧪 Documentation OpenAPI
-Accédez aux interfaces interactives une fois le serveur lancé :
-- **Swagger UI (Docs) :** [http://127.0.0.1:8000/docs](http://127.0.0.1:8000/docs)
-- **ReDoc :** [http://127.0.0.1:8000/redoc](http://127.0.0.1:8000/redoc)
+1. Appliquer les migrations (`alembic upgrade head`) — la révision `0002` crée les tables `iso_proxmox_templates` et `proxmox_node_mappings` (lignes d’exemple pour REM / RAM / EMILIA).
+2. Renseigner dans `.env` : `PROXMOX_ENABLED=true`, `PROXMOX_HOST`, `PROXMOX_USER`, `PROXMOX_TOKEN_ID`, `PROXMOX_TOKEN_SECRET`, `PROXMOX_VERIFY_SSL` (souvent `false` en labo).
+3. Ajuster les **mappings** nœud métier → nom de nœud Proxmox (API admin ou table `proxmox_node_mappings`) et une ligne **par ISO** dans `iso_proxmox_templates` (VMID du template à cloner).
+4. Optionnel : `PROXMOX_DEFAULT_NODE` si un nœud métier n’a pas encore de ligne de mapping ; `PROXMOX_NET0_TEMPLATE` pour le modèle `net0` (ex. `virtio,bridge=vmbr0`), complété par `,tag={vlan_id}` si la VM a un VLAN.
 
----
-*Fichier README généré pour le projet Horizon Backend.*
+Après un **seed** local, des correspondances ISO → template **fictives** (VMID `9000+`) sont insérées : à remplacer en production par les vrais ID de templates Proxmox.
+
+Endpoints d’exploration / pause : préfixe admin existant, sous-chemins `.../proxmox/...` (voir OpenAPI `/docs`).
+
+## Tests
+
+Créer un environnement virtuel, installer les dépendances, lancer la suite (Docker requis pour Postgres Testcontainers). `pytest.ini` définit déjà `pythonpath = .` :
+
+```bash
+python3 -m venv .venv
+.venv/bin/pip install -r requirements.txt -r requirements-dev.txt
+.venv/bin/pytest tests/ -v
+```

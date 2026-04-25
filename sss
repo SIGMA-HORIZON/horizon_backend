@@ -1,0 +1,10 @@
+# Script de diagnostic (à lancer dans l'env du backend)
+from horizon.infrastructure.database import SessionLocal
+from horizon.shared.models import IsoProxmoxTemplate, ISOImage
+
+db = SessionLocal()
+templates = db.query(IsoProxmoxTemplate).all()
+for t in templates:
+    iso = db.query(ISOImage).filter(ISOImage.id == t.iso_image_id).first()
+    print(f"ISO: {iso.name} -> Proxmox Template ID: {t.proxmox_template_vmid}")
+db.close()

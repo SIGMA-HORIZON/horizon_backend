@@ -1,39 +1,32 @@
-# Byte-compiled / optimized / DLL files
-*/__pycache__/
-*.pyc
+# Environnements Python locaux (jamais nécessaires au déploiement)
+.venv/
+venv/
+env/
+
+# Bytecode & caches
+__pycache__/
 *.py[cod]
 *$py.class
-
-# C extensions
 *.so
+.Python
 
-# Environments
-.env
-.venv
-env/
-venv/
-ENV/
-
-# Distribution / packaging
-dist/
-build/
-*.egg-info/
-
-# Unit test / coverage reports
+# Tests / outils
 .pytest_cache/
 .coverage
 htmlcov/
-
-# MyPy
 .mypy_cache/
+.ruff_cache/
 
-# IDEs
-.vscode/
-.idea/
+# Secrets locaux (le dépôt garde .env.example)
+.env
+.env.local
+.env.*.local
 
-# OS
+# OS / éditeur (hors dépôt de prod)
 .DS_Store
+Thumbs.db
+.idea/
+.vscode/
 
-# Project
+# Logs locaux
 *.log
-*.sqlite
