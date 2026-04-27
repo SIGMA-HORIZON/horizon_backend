@@ -217,6 +217,12 @@ class ISOImageCreate(BaseModel):
     os_version: str
     description: str | None = None
 
+    @field_validator("os_family", mode="before")
+    @classmethod
+    def normalise_os_family(cls, v: str) -> str:
+        """Force la valeur en majuscule pour correspondre à l'enum os_family_enum en DB."""
+        return v.upper()
+
 
 class ProxmoxNodeSummary(BaseModel):
     name: str
@@ -240,7 +246,10 @@ class PrepareTemplateRequest(BaseModel):
     vmid: int = Field(..., ge=100)
     node: str
     storage: str = "local"
-    iso_storage: str | None = Field(default=None, description="Stockage où se trouve l'ISO (si différent du stockage disque)")
+    iso_storage: str | None = Field(
+        default=None,
+        description="Stockage où se trouve l'ISO (si différent du stockage disque)",
+    )
     iso_filename: str
     name: str = "template-prepare"
     vcpu: int = 2
@@ -260,3 +269,81 @@ class ProxmoxCreateVMRequest(BaseModel):
     storage_gb: int = 10
     net0: str = "virtio,bridge=vmbr0"
 
+
+# ---------------------------------------------------------------------------
+# TinyVM — micro-VM optimisées (Alpine Linux ou équivalent léger)
+# ---------------------------------------------------------------------------
+
+TINYVM_VCPU_DEFAULT = 1
+TINYVM_RAM_MB_DEFAULT = 512
+TINYVM_STORAGE_GB_DEFAULT = 4
+TINYVM_ISO_DEFAULT = "alpine-standard-latest.iso"
+TINYVM_ISO_STORAGE_DEFAULT = "local"
+TINYVM_NET0_DEFAULT = "virtio,bridge=vmbr0"
+
+
+class TinyVMCreate(BaseModel):
+    """
+    Paramètres de création d'une TinyVM (micro-VM Alpine optimisée).
+
+    Les ressources sont volontairement plafonnées côté schéma pour empêcher
+    qu'un administrateur crée accidentellement une VM "full-size" via cet endpoint.
+    """
+
+    vmid: int = Field(..., ge=100, description="VMID Proxmox cible (≥ 100)")
+    node: str = Field(..., description="Nœud Proxmox cible (ex. pve1)")
+    name: str = Field(
+        default="tinyvm",
+        min_length=1,
+        max_length=64,
+        description="Nom de la VM Proxmox",
+    )
+    storage: str = Field(
+        default="local",
+        description="Stockage Proxmox pour le disque de la VM",
+    )
+    iso_storage: str = Field(
+        default=TINYVM_ISO_STORAGE_DEFAULT,
+        description="Stockage Proxmox où se trouve l'ISO Alpine",
+    )
+    iso_filename: str = Field(
+        default=TINYVM_ISO_DEFAULT,
+        description="Nom du fichier ISO à monter (doit être présent sur le stockage iso_storage)",
+    )
+    vcpu: int = Field(
+        default=TINYVM_VCPU_DEFAULT,
+        ge=1,
+        le=2,
+        description="Nombre de vCPUs (max 2 pour une TinyVM)",
+    )
+    ram_mb: int = Field(
+        default=TINYVM_RAM_MB_DEFAULT,
+        ge=256,
+        le=1024,
+        description="RAM en Mo (256 Mo – 1 Go pour une TinyVM)",
+    )
+    storage_gb: int = Field(
+        default=TINYVM_STORAGE_GB_DEFAULT,
+        ge=2,
+        le=10,
+        description="Taille du disque en Go (2 – 10 Go pour une TinyVM)",
+    )
+    net0: str = Field(
+        default=TINYVM_NET0_DEFAULT,
+        description="Paramètre réseau net0 Proxmox",
+    )
+    start_after_create: bool = Field(
+        default=False,
+        description="Démarrer la VM immédiatement après sa création",
+    )
+
+
+class TinyVMResponse(BaseModel):
+    """Réponse après création d'une TinyVM."""
+
+    vmid: int
+    node: str
+    name: str
+    status: str
+    message: str
+    proxmox_task: dict[str, Any] | None = None

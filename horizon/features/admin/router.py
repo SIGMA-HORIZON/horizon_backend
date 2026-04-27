@@ -263,29 +263,88 @@ def admin_create_iso(body: schemas.ISOImageCreate, admin: AdminUser, db: Session
     return admin_service.create_iso_image(db, body)
 
 
-@router.get("/proxmox/storage-isos", summary="[Admin] Lister les fichiers ISO physiques sur Proxmox")
-def admin_list_proxmox_isos(admin: AdminUser, node: str = "pve", storage: str = "local"):
+@router.get(
+    "/proxmox/storage-isos",
+    summary="[Admin] Lister les fichiers ISO physiques sur Proxmox",
+)
+def admin_list_proxmox_isos(
+    admin: AdminUser,
+    node: str = Query("pve", description="Nœud Proxmox cible"),
+    storage: str = Query("local", description="Nom du stockage Proxmox"),
+):
     from horizon.infrastructure.proxmox_client import ProxmoxClient
+
     client = ProxmoxClient()
     return client.list_isos_on_storage(node, storage)
 
 
-@router.post("/proxmox/upload-iso", summary="[Admin] Uploader un fichier ISO sur Proxmox")
+@router.post(
+    "/proxmox/upload-iso",
+    summary="[Admin] Uploader un fichier ISO physiquement vers Proxmox + enregistrement en DB",
+)
 async def admin_upload_proxmox_iso(
     admin: AdminUser,
-    node: str = Query("pve"),
-    storage: str = Query("local"),
-    name: str | None = Query(None),
-    os_family: str = Query("LINUX"),
-    os_version: str = Query("Unknown"),
-    description: str | None = Query(None),
-    file: UploadFile = File(...),
+    db: Session = Depends(get_db),
+    node: str = Query("pve", description="Nœud Proxmox cible"),
+    storage: str = Query("local", description="Stockage Proxmox destinataire"),
+    name: str | None = Query(
+        None,
+        description="Nom convivial de l'ISO dans le catalogue (utilise le nom de fichier si absent)",
+    ),
+    os_family: str = Query(
+        "LINUX",
+        description="Famille OS : LINUX, WINDOWS, BSD, OTHER (insensible à la casse)",
+    ),
+    os_version: str = Query("Unknown", description="Version de l'OS (ex. Ubuntu 24.04)"),
+    description: str | None = Query(None, description="Description libre de l'ISO"),
+    # UploadFile doit être le dernier paramètre non-Query pour que FastAPI
+    # parse correctement le multipart/form-data.
+    file: UploadFile = File(..., description="Fichier ISO à uploader (.iso)"),
+):
+    """
+    Upload multipart d'un fichier ISO :
+    1. Réception du fichier via `UploadFile`.
+    2. Upload physique vers le nœud Proxmox via `ProxmoxClient`.
+    3. Enregistrement dans `iso_images` seulement si l'upload Proxmox réussit.
+    """
+    return await admin_service.upload_iso_to_proxmox(
+        db=db,
+        admin_id=admin.id,
+        node=node,
+        storage=storage,
+        file_obj=file.file,
+        filename=file.filename,
+        name=name,
+        os_family=os_family,
+        os_version=os_version,
+        description=description,
+    )
+
+@router.post(
+    "/proxmox/tiny-vms",
+    response_model=schemas.TinyVMResponse,
+    status_code=201,
+    summary="[Admin] Créer une TinyVM (micro-VM Alpine optimisée)",
+    description=(
+        "Crée une micro-VM aux ressources volontairement limitées (≤ 2 vCPUs, "
+        "≤ 1 Go RAM, ≤ 10 Go disque) idéale pour des environnements de test ou "
+        "des tâches légères. Utilise un ISO Alpine Linux par défaut. "
+        "L'option `start_after_create` permet de démarrer la VM immédiatement."
+    ),
+)
+async def admin_create_tiny_vm(
+    body: schemas.TinyVMCreate,
+    admin: AdminUser,
     db: Session = Depends(get_db),
 ):
-    return await admin_service.upload_iso_to_proxmox(
-        db, admin.id, node, storage, file.file, file.filename,
-        name, os_family, os_version, description
-    )
+    """
+    Route dédiée aux TinyVMs.
+
+    Le schéma `TinyVMCreate` plafonne les ressources côté validation Pydantic,
+    ce qui rend cet endpoint visuellement distinct de `/proxmox/create-vm`
+    dans la documentation Swagger.
+    """
+    return await admin_service.create_tiny_vm(db, body)
 
 
 @router.post("/proxmox/create-vm", summary="[Admin] Créer une VM directement depuis un ISO (sans template)")
