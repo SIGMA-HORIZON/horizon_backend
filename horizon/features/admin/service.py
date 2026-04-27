@@ -393,3 +393,61 @@ async def create_vm_directly(db: Session, body: schemas.ProxmoxCreateVMRequest) 
     except ProxmoxIntegrationError as e:
         raise PolicyError("PROXMOX", e.message, e.status_code) from e
 
+
+async def admin_server_shutdown(
+    db: Session, body: schemas.ServerShutdownRequest, admin_id: uuid.UUID
+) -> schemas.ServerShutdownResponse:
+    from datetime import datetime, timezone
+    from horizon.infrastructure.proxmox_client import (
+        ProxmoxClient,
+        ProxmoxIntegrationError,
+    )
+    from horizon.shared.models.audit_log import SecurityIncident, IncidentType, IncidentSeverity, IncidentStatus
+
+    # 1. Validation consciente
+    if body.confirmation != "CONFIRMER":
+        raise PolicyError("ADMIN", "Validation incorrecte. Tapez 'CONFIRMER'.", 400)
+
+    _require_proxmox_enabled()
+    assert_known_proxmox_node_name(db, body.node_name)
+
+    # 2. Journalisation de l'incident de sécurité (toujours, car action critique)
+    severity = IncidentSeverity.CRITICAL if body.emergency else IncidentSeverity.HIGH
+    desc = f"Extinction du serveur (nœud {body.node_name}) par l'administrateur."
+    if body.emergency:
+        desc = f"EXTINCTION D'URGENCE du serveur (nœud {body.node_name}) déclenchée."
+
+    incident = SecurityIncident(
+        id=uuid.uuid4(),
+        user_id=admin_id,
+        incident_type=IncidentType.POLICY_VIOLATION,
+        severity=severity,
+        status=IncidentStatus.OPEN,
+        description=desc,
+        created_at=datetime.now(timezone.utc)
+    )
+    db.add(incident)
+    
+    # Trace d'audit
+    from horizon.shared.audit_service import log_action
+    from horizon.shared.models import AuditAction
+    log_action(
+        db, admin_id, AuditAction.SECURITY_INCIDENT_CREATED, "system", None,
+        metadata={"action": "server_shutdown", "node": body.node_name, "emergency": body.emergency}
+    )
+    db.commit()
+
+    # 3. Action Proxmox
+    try:
+        client = ProxmoxClient()
+        # Note: Proxmox shutdown est asynchrone (retourne un UPID)
+        await client.shutdown_node(body.node_name)
+        
+        msg = f"Ordre d'extinction envoyé au nœud {body.node_name}."
+        if body.emergency:
+            msg = f"Extinction d'URGENCE en cours sur le nœud {body.node_name}."
+            
+        return schemas.ServerShutdownResponse(message=msg)
+    except ProxmoxIntegrationError as e:
+        raise PolicyError("PROXMOX", e.message, e.status_code) from e
+

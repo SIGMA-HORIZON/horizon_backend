@@ -306,3 +306,16 @@ async def admin_prepare_template(
 @router.get("/reservations", response_model=schemas.ReservationListResponse, summary="[Admin] Liste toutes les réservations")
 def admin_list_reservations(admin: AdminUser, db: Session = Depends(get_db)):
     return admin_service.list_reservations(db)
+
+
+@router.post(
+    "/server/shutdown",
+    response_model=schemas.ServerShutdownResponse,
+    summary="[Admin] Extinction contrôlée du serveur (Nœud Proxmox)",
+)
+async def admin_server_shutdown(
+    body: schemas.ServerShutdownRequest,
+    admin: AdminUser,
+    db: Session = Depends(get_db),
+):
+    return await admin_service.admin_server_shutdown(db, body, admin.id)

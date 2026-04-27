@@ -58,8 +58,8 @@ class ProxmoxClient:
         h = self._settings.PROXMOX_HOST
         p = self._settings.PROXMOX_PORT
         u = self._settings.PROXMOX_USER
-        tn = self._settings.PROXMOX_TOKEN_NAME
-        tv = self._settings.PROXMOX_TOKEN_VALUE
+        tn = self._settings.PROXMOX_TOKEN_ID
+        tv = self._settings.PROXMOX_TOKEN_SECRET
         if not all([h, u, tn, tv]):
             raise ProxmoxIntegrationError(
                 "Configuration Proxmox incomplète (host, user, token).", 500
@@ -499,4 +499,16 @@ class ProxmoxClient:
             return summary
         except Exception as e:
             logger.exception("get_cluster_status")
+            raise ProxmoxIntegrationError(str(e), 502) from e
+
+    async def shutdown_node(self, node: str) -> dict[str, Any]:
+        """Éteint un nœud Proxmox physiquement."""
+        if not self._api:
+            raise ProxmoxIntegrationError("Proxmox désactivé.", 503)
+        try:
+            # POST /nodes/{node}/status?command=shutdown
+            upid = self._nodes(node).status.post(command="shutdown")
+            return {"status": "success", "message": f"Commande d'extinction envoyée au nœud {node}.", "upid": upid}
+        except Exception as e:
+            logger.exception(f"Erreur lors de l'extinction du nœud {node}")
             raise ProxmoxIntegrationError(str(e), 502) from e

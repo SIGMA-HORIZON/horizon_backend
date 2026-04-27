@@ -260,3 +260,14 @@ class ProxmoxCreateVMRequest(BaseModel):
     storage_gb: int = 10
     net0: str = "virtio,bridge=vmbr0"
 
+
+class ServerShutdownRequest(BaseModel):
+    node_name: str = Field(..., description="Nom du nœud Proxmox à éteindre")
+    confirmation: str = Field(..., description="Doit être 'CONFIRMER'")
+    emergency: bool = Field(default=False, description="Mode urgence (extinction immédiate)")
+
+
+class ServerShutdownResponse(BaseModel):
+    message: str
+    status: str = "success"
+

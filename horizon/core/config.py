@@ -74,8 +74,8 @@ class Settings(BaseSettings):
     PROXMOX_HOST: str = ""
     PROXMOX_PORT: int = 8006
     PROXMOX_USER: str = ""
-    PROXMOX_TOKEN_NAME: str = ""
-    PROXMOX_TOKEN_VALUE: str = ""
+    PROXMOX_TOKEN_ID: str = ""
+    PROXMOX_TOKEN_SECRET: str = ""
     PROXMOX_VERIFY_SSL: bool = False
     PROXMOX_NODE: str = ""
     PROXMOX_NET0_TEMPLATE: str = "virtio,bridge=vmbr0"
