@@ -288,8 +288,21 @@ async def admin_upload_proxmox_iso(
     )
 
 
+@router.post("/proxmox/create-vm", summary="[Admin] Créer une VM directement depuis un ISO (sans template)")
+async def admin_create_proxmox_vm(
+    body: schemas.ProxmoxCreateVMRequest, admin: AdminUser, db: Session = Depends(get_db)
+):
+    return await admin_service.create_vm_directly(db, body)
+
+
 @router.post("/proxmox/prepare-template", summary="[Admin] Préparer une VM à partir d'un ISO pour en faire un template")
+
 async def admin_prepare_template(
     body: schemas.PrepareTemplateRequest, admin: AdminUser, db: Session = Depends(get_db)
 ):
     return await admin_service.prepare_vm_template(db, body)
+
+
+@router.get("/reservations", response_model=schemas.ReservationListResponse, summary="[Admin] Liste toutes les réservations")
+def admin_list_reservations(admin: AdminUser, db: Session = Depends(get_db)):
+    return admin_service.list_reservations(db)

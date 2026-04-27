@@ -15,6 +15,13 @@ from horizon.shared.policies.enforcer import PolicyError, enforce_vm_ownership
 router = APIRouter(prefix="/vms", tags=["Machines Virtuelles"])
 
 
+@router.get("/available-isos", summary="Lister les images ISO disponibles")
+def list_available_isos(current_user: CurrentUser, db: Session = Depends(get_db)):
+    from horizon.shared.models import ISOImage
+    rows = db.query(ISOImage).filter(ISOImage.is_active == True).all()
+    return {"items": rows}
+
+
 @router.post(
     "",
     response_model=schemas.VMResponse,

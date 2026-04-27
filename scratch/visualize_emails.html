@@ -1,0 +1,92 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Aperçu des Emails Horizon</title>
+    <style>
+        body { font-family: sans-serif; background-color: #e2e8f0; padding: 20px; }
+        .preview-container { display: flex; flex-direction: column; gap: 40px; align-items: center; }
+        .email-preview { border: 1px solid #ccc; box-shadow: 0 4px 6px rgba(0,0,0,0.1); width: 100%; max-width: 650px; }
+        .label { font-weight: bold; margin-bottom: 10px; color: #1e293b; text-transform: uppercase; font-size: 14px; }
+    </style>
+</head>
+<body>
+    <div class="preview-container">
+        
+        <div>
+            <div class="label">1. Email de Demande d'accès (Accusé de réception)</div>
+            <div class="email-preview">
+                <!-- Rendu de send_account_request_received -->
+                <div style="margin: 0; padding: 0; font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; background-color: #f1f5f9; color: #1e293b;">
+                    <div style="max-width: 600px; margin: 40px auto; background-color: #ffffff; border-radius: 16px; overflow: hidden; box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1);">
+                        <div style="background-color: #0f172a; padding: 40px; text-align: center;">
+                            <img src="https://horizon.enspy.cm/static/logo.png" alt="HORIZON" style="height: 60px; margin-bottom: 16px;">
+                            <h1 style="color: #60a5fa; margin: 0; font-size: 26px; font-weight: 800; letter-spacing: -0.025em;">HORIZON</h1>
+                            <p style="color: #94a3b8; margin: 8px 0 0; font-size: 14px; font-weight: 500;">Cloud Académique de l'ENSPY</p>
+                        </div>
+                        <div style="padding: 48px; line-height: 1.6;">
+                            <h2 style="color: #0f172a; font-size: 22px; margin-top: 0;">Accusé de réception</h2>
+                            <p>Bonjour <b>Jean-Marc</b>,</p>
+                            <p>Nous avons bien reçu votre demande de création de compte sur <strong>Horizon</strong>.</p>
+                            <div style="background-color: #f0f9ff; border-left: 4px solid #0ea5e9; padding: 16px; margin: 24px 0; border-radius: 0 8px 8px 0;">
+                                <p style="margin: 0; color: #075985;">Un administrateur va examiner votre profil. Vous recevrez une notification par e-mail dès qu'une décision sera prise (généralement sous 24h ouvrées).</p>
+                            </div>
+                            <p>Merci de votre patience.</p>
+                            <div style="margin-top: 48px; padding-top: 32px; border-top: 1px solid #e2e8f0; font-size: 13px; color: #64748b; text-align: center;">
+                                <p style="margin-bottom: 8px;">Ceci est un message automatique du système <b>Horizon</b>.</p>
+                                <p style="margin-bottom: 16px;">Merci de ne pas répondre directement à cet e-mail.</p>
+                                <div style="font-weight: 600; color: #1e293b;">
+                                    &copy; 2026 Équipe Horizon - École Nationale Supérieure Polytechnique de Yaoundé
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div>
+            <div class="label">2. Email d'Identifiants (Approbation)</div>
+            <div class="email-preview">
+                <!-- Rendu de send_account_credentials -->
+                <div style="margin: 0; padding: 0; font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; background-color: #f1f5f9; color: #1e293b;">
+                    <div style="max-width: 600px; margin: 40px auto; background-color: #ffffff; border-radius: 16px; overflow: hidden; box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1);">
+                        <div style="background-color: #0f172a; padding: 40px; text-align: center;">
+                            <img src="https://horizon.enspy.cm/static/logo.png" alt="HORIZON" style="height: 60px; margin-bottom: 16px;">
+                            <h1 style="color: #60a5fa; margin: 0; font-size: 26px; font-weight: 800; letter-spacing: -0.025em;">HORIZON</h1>
+                            <p style="color: #94a3b8; margin: 8px 0 0; font-size: 14px; font-weight: 500;">Cloud Académique de l'ENSPY</p>
+                        </div>
+                        <div style="padding: 48px; line-height: 1.6;">
+                            <div style="text-align: center; margin-bottom: 32px;">
+                                <h2 style="color: #0f172a; font-size: 24px; margin: 0;">Bienvenue sur Horizon !</h2>
+                                <p style="color: #64748b; margin-top: 8px;">Votre accès est prêt.</p>
+                            </div>
+                            <p>Bonjour,</p>
+                            <p>Votre demande a été approuvée avec succès. Vous pouvez maintenant accéder à vos ressources cloud sur la plateforme <strong>Horizon ENSPY</strong>.</p>
+                            <div style="background-color: #f8fafc; border: 1px solid #e2e8f0; padding: 24px; border-radius: 12px; margin: 32px 0;">
+                                <p style="margin: 0 0 12px;"><b>Identifiant :</b> <code style="color: #2563eb; font-size: 16px;">j.marc237</code></p>
+                                <p style="margin: 0;"><b>Mot de passe :</b> <code style="color: #2563eb; font-size: 16px;">Hz-K9pQ-2026</code></p>
+                            </div>
+                            <div style="background-color: #fff7ed; border-left: 4px solid #f97316; padding: 16px; margin-bottom: 32px; border-radius: 0 8px 8px 0;">
+                                <p style="margin: 0; color: #9a3412; font-size: 14px;"><b>⚠️ Important :</b> Pour des raisons de sécurité, vous devrez changer ce mot de passe dès votre première connexion.</p>
+                            </div>
+                            <div style="text-align: center;">
+                                <a href="https://horizon.enspy.cm/connexion" style="background-color: #2563eb; color: #ffffff; padding: 14px 40px; text-decoration: none; border-radius: 8px; font-weight: 600; display: inline-block; box-shadow: 0 4px 6px -1px rgba(37, 99, 235, 0.2);">Accéder à la plateforme</a>
+                            </div>
+                            <div style="margin-top: 48px; padding-top: 32px; border-top: 1px solid #e2e8f0; font-size: 13px; color: #64748b; text-align: center;">
+                                <p style="margin-bottom: 8px;">Ceci est un message automatique du système <b>Horizon</b>.</p>
+                                <p style="margin-bottom: 16px;">Merci de ne pas répondre directement à cet e-mail.</p>
+                                <div style="font-weight: 600; color: #1e293b;">
+                                    &copy; 2026 Équipe Horizon - École Nationale Supérieure Polytechnique de Yaoundé
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+    </div>
+</body>
+</html>

@@ -5,8 +5,8 @@ from __future__ import annotations
 import logging
 import asyncio
 import time
-from typing import Any
 import urllib.parse
+from typing import Any
 import requests
 import urllib3
 import os
@@ -79,6 +79,7 @@ class ProxmoxClient:
                 token_name=tn,
                 token_value=tv,
                 verify_ssl=self._settings.PROXMOX_VERIFY_SSL,
+                timeout=self._settings.PROXMOX_TIMEOUT,
             )
         except Exception as e:
             logger.exception("Init ProxmoxAPI")
@@ -175,6 +176,49 @@ class ProxmoxClient:
             }
         except Exception as e:
             logger.exception("create_vm_from_template")
+            if isinstance(e, ProxmoxIntegrationError):
+                raise
+            raise ProxmoxIntegrationError(str(e), 502) from e
+
+    async def create_vm(
+        self,
+        node: str,
+        vmid: int,
+        name: str,
+        storage: str,
+        iso_filename: str,
+        vcpu: int,
+        ram_mb: int,
+        storage_gb: int,
+        iso_storage: str | None = None,
+        net0: str = "virtio,bridge=vmbr0",
+        agent: int = 1
+    ) -> dict[str, Any]:
+        """Crée une VM directement à partir d'un ISO (sans template)."""
+        if not self._api:
+            raise ProxmoxIntegrationError("Proxmox désactivé.", 503)
+        try:
+            n = self._nodes(node)
+            iso_path_storage = iso_storage or storage
+            
+            params = {
+                "vmid": vmid,
+                "name": name,
+                "cores": vcpu,
+                "memory": ram_mb,
+                "scsihw": "virtio-scsi-pci",
+                "net0": net0,
+                "ide2": f"{iso_path_storage}:iso/{iso_filename},media=cdrom",
+                "scsi0": f"{storage}:{storage_gb}",
+                "ostype": "l26",
+                "agent": agent,
+            }
+            
+            upid = n.qemu.post(**params)
+            await self.wait_for_task(node, upid)
+            return {"status": "success", "message": f"VM {name} ({vmid}) créée sur {node} depuis ISO.", "vmid": vmid}
+        except Exception as e:
+            logger.exception(f"Erreur lors de la création de la VM {vmid} depuis ISO")
             if isinstance(e, ProxmoxIntegrationError):
                 raise
             raise ProxmoxIntegrationError(str(e), 502) from e
@@ -362,32 +406,22 @@ class ProxmoxClient:
         iso_storage: str | None = None
     ) -> dict[str, Any]:
         """Crée une VM configurée pour devenir un template (ISO monté, Cloud-Init prêt)."""
-        if not self._api:
-            raise ProxmoxIntegrationError("Proxmox désactivé.", 503)
+        # On utilise le nouveau create_vm pour la création de base
+        await self.create_vm(
+            node=node,
+            vmid=vmid,
+            name=name,
+            storage=storage,
+            iso_filename=iso_filename,
+            vcpu=vcpu,
+            ram_mb=ram_mb,
+            storage_gb=storage_gb,
+            iso_storage=iso_storage
+        )
+        
         try:
             n = self._nodes(node)
-            
-            # Utiliser le stockage spécifié pour l'ISO ou le stockage principal par défaut
-            iso_path_storage = iso_storage or storage
-            
-            # Paramètres de création
-            params = {
-                "vmid": vmid,
-                "name": name,
-                "cores": vcpu,
-                "memory": ram_mb,
-                "scsihw": "virtio-scsi-pci",
-                "net0": "virtio,bridge=vmbr0",
-                "ide2": f"{iso_path_storage}:iso/{iso_filename},media=cdrom",
-                "scsi0": f"{storage}:{storage_gb}",
-                "ostype": "l26", # Linux 2.6+
-                "agent": 1,      # Activer l'agent QEMU
-            }
-            
-            upid = n.qemu.post(**params)
-            await self.wait_for_task(node, upid)
-            
-            # Ajouter un disque Cloud-Init
+            # Ajouter un disque Cloud-Init (spécifique à la préparation de template)
             n.qemu(vmid).config.post(ide0=f"{storage}:cloudinit")
             
             return {
@@ -396,7 +430,7 @@ class ProxmoxClient:
                 "vmid": vmid
             }
         except Exception as e:
-            logger.exception(f"Erreur lors de la préparation de la VM template {vmid}")
+            logger.exception(f"Erreur lors du post-provisioning Cloud-Init pour template {vmid}")
             if isinstance(e, ProxmoxIntegrationError):
                 raise
             raise ProxmoxIntegrationError(str(e), 502) from e
@@ -409,6 +443,16 @@ class ProxmoxClient:
         except Exception as e:
             logger.error(f"Erreur lors de la récupération des ISOs sur {node}/{storage}: {e}")
             return []
+
+    def get_next_vmid(self) -> int:
+        """Récupère le prochain VMID disponible sur le cluster."""
+        if not self._api:
+            raise ProxmoxIntegrationError("Proxmox désactivé.", 503)
+        try:
+            return int(self._api.cluster.nextid.get())
+        except Exception as e:
+            logger.exception("get_next_vmid")
+            raise ProxmoxIntegrationError(str(e), 502) from e
 
 
     def get_cluster_status(self) -> dict[str, Any]:

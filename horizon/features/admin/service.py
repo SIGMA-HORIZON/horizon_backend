@@ -14,6 +14,7 @@ from horizon.shared.models import (
     IsoProxmoxTemplate,
     ProxmoxNodeMapping,
     QuotaOverride,
+    Reservation,
     User,
     VirtualMachine,
 )
@@ -137,6 +138,30 @@ def admin_proxmox_vm_status(db: Session, proxmox_vmid: int) -> schemas.ProxmoxVm
     except ProxmoxIntegrationError as e:
         raise PolicyError("PROXMOX", e.message, e.status_code) from e
     return schemas.ProxmoxVmStatusResponse(data=data)
+
+
+def list_reservations(db: Session) -> schemas.ReservationListResponse:
+    rows = db.query(Reservation).order_by(Reservation.created_at.desc()).all()
+    items = []
+    for r in rows:
+        vm = r.vm
+        user = r.user
+        items.append(
+            schemas.ReservationRowResponse(
+                id=r.id,
+                vm_name=vm.name if vm else "VM inconnue",
+                user_full_name=f"{user.first_name} {user.last_name}" if user else "Inconnu",
+                user_email=user.email if user else "-",
+                os_name=vm.iso_image.name if (vm and vm.iso_image) else "N/A",
+                vcpu=vm.vcpu if vm else 0,
+                ram_gb=vm.ram_gb if vm else 0.0,
+                storage_gb=vm.storage_gb if vm else 0.0,
+                duration_hours=int((r.end_time - r.start_time).total_seconds() // 3600),
+                status=vm.status.value if vm else "TERMINÉE",
+                created_at=r.created_at,
+            )
+        )
+    return schemas.ReservationListResponse(items=items)
 
 
 def list_proxmox_node_mappings(db: Session) -> schemas.ProxmoxNodeMappingListResponse:
@@ -342,3 +367,29 @@ async def prepare_vm_template(db: Session, body: schemas.PrepareTemplateRequest)
         )
     except ProxmoxIntegrationError as e:
         raise PolicyError("PROXMOX", e.message, e.status_code) from e
+
+
+async def create_vm_directly(db: Session, body: schemas.ProxmoxCreateVMRequest) -> dict[str, Any]:
+    from horizon.infrastructure.proxmox_client import (
+        ProxmoxClient,
+        ProxmoxIntegrationError,
+    )
+
+    _require_proxmox_enabled()
+    try:
+        client = ProxmoxClient()
+        return await client.create_vm(
+            node=body.node,
+            vmid=body.vmid,
+            name=body.name,
+            storage=body.storage,
+            iso_filename=body.iso_filename,
+            vcpu=body.vcpu,
+            ram_mb=body.ram_mb,
+            storage_gb=body.storage_gb,
+            iso_storage=body.iso_storage,
+            net0=body.net0
+        )
+    except ProxmoxIntegrationError as e:
+        raise PolicyError("PROXMOX", e.message, e.status_code) from e
+
