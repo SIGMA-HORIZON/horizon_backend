@@ -1,6 +1,7 @@
 "use client";
 import React, { useEffect, useState } from 'react';
 import { accountService } from '@/services/accounts';
+import Modal, { ModalType } from '@/app/components/Modal';
 
 interface AccountRequest {
     id: string;
@@ -20,6 +21,14 @@ export default function DemandesComptes() {
     const [rejectReason, setRejectReason] = useState('');
     const [isRejectModalOpen, setIsRejectModalOpen] = useState(false);
     const [isApproveModalOpen, setIsApproveModalOpen] = useState(false);
+    const [alertConfig, setAlertConfig] = useState<{ isOpen: boolean; type: ModalType; title: string; message: string }>({ isOpen: false, type: 'info', title: '', message: '' });
+
+    const showAlert = (title: string, message: string, type: ModalType = 'info') => {
+        setAlertConfig({ isOpen: true, title, message, type });
+    };
+    const closeAlert = () => {
+        setAlertConfig(prev => ({ ...prev, isOpen: false }));
+    };
 
     useEffect(() => {
         fetchRequests();
@@ -32,7 +41,7 @@ export default function DemandesComptes() {
             setRequests(data.items || []);
         } catch (error) {
             console.error('Error fetching requests:', error);
-            alert('Erreur lors du chargement des demandes');
+            showAlert('Erreur', 'Erreur lors du chargement des demandes', 'error');
         } finally {
             setLoading(false);
         }
@@ -42,13 +51,13 @@ export default function DemandesComptes() {
         if (!selectedRequest) return;
         try {
             await accountService.approveRequest(selectedRequest.id);
-            alert(`Le compte de ${selectedRequest.first_name} a été approuvé`);
+            showAlert('Succès', `Le compte de ${selectedRequest.first_name} a été approuvé`, 'success');
             setIsApproveModalOpen(false);
             setSelectedRequest(null);
             fetchRequests();
         } catch (error) {
             console.error('Error approving request:', error);
-            alert('Erreur lors de l\'approbation');
+            showAlert('Erreur', 'Erreur lors de l\'approbation', 'error');
         }
     };
 
@@ -56,14 +65,14 @@ export default function DemandesComptes() {
         if (!selectedRequest || !rejectReason) return;
         try {
             await accountService.rejectRequest(selectedRequest.id, rejectReason);
-            alert(`La demande de ${selectedRequest.first_name} a été rejetée`);
+            showAlert('Succès', `La demande de ${selectedRequest.first_name} a été rejetée`, 'success');
             setIsRejectModalOpen(false);
             setSelectedRequest(null);
             setRejectReason('');
             fetchRequests();
         } catch (error) {
             console.error('Error rejecting request:', error);
-            alert('Erreur lors du rejet');
+            showAlert('Erreur', 'Erreur lors du rejet', 'error');
         }
     };
 
@@ -234,6 +243,8 @@ export default function DemandesComptes() {
                     </div>
                 </div>
             )}
+
+            <Modal {...alertConfig} onClose={closeAlert} />
         </div>
     );
 }

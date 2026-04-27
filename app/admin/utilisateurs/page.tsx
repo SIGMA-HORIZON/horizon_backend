@@ -1,6 +1,7 @@
 "use client";
 import React, { useEffect, useState } from 'react';
 import { accountService } from '@/services/accounts';
+import Modal, { ModalType } from '@/app/components/Modal';
 
 interface User {
   id: string;
@@ -17,6 +18,14 @@ export default function Utilisateurs() {
   const [users, setUsers] = useState<User[]>([]);
   const [loading, setLoading] = useState(true);
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [alertConfig, setAlertConfig] = useState<{ isOpen: boolean; type: ModalType; title: string; message: string }>({ isOpen: false, type: 'info', title: '', message: '' });
+
+  const showAlert = (title: string, message: string, type: ModalType = 'info') => {
+    setAlertConfig({ isOpen: true, title, message, type });
+  };
+  const closeAlert = () => {
+    setAlertConfig(prev => ({ ...prev, isOpen: false }));
+  };
 
   // States for new user form
   const [formData, setFormData] = useState({
@@ -38,7 +47,7 @@ export default function Utilisateurs() {
       setUsers(data.items || []);
     } catch (error) {
       console.error('Error fetching users:', error);
-      alert('Erreur lors du chargement des utilisateurs');
+      showAlert('Erreur', 'Erreur lors du chargement des utilisateurs', 'error');
     } finally {
       setLoading(false);
     }
@@ -49,7 +58,7 @@ export default function Utilisateurs() {
     // Implementation for direct user creation via API if needed
     // For now we just close the modal as the user requested "validation of requests"
     setIsModalOpen(false);
-    alert('Fonctionnalité de création directe en cours de développement. Utilisez les demandes de compte.');
+    showAlert('Information', 'Fonctionnalité de création directe en cours de développement. Utilisez les demandes de compte.', 'info');
   };
 
   const getInitials = (fn: string, ln: string) => {
@@ -152,6 +161,7 @@ export default function Utilisateurs() {
           </div>
         </div>
       )}
+      <Modal {...alertConfig} onClose={closeAlert} />
     </div>
   );
 }

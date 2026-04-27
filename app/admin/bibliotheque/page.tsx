@@ -2,6 +2,7 @@
 import React, { useState, useEffect } from 'react';
 import { adminService } from '../../../services/admin';
 import IsoUploadModal from './IsoUploadModal';
+import Modal, { ModalType } from '@/app/components/Modal';
 
 export default function OSBibliotheque() {
   const [activeTab, setActiveTab] = useState('templates'); // 'templates' | 'isos'
@@ -12,6 +13,14 @@ export default function OSBibliotheque() {
   // Modals
   const [isIsoModalOpen, setIsIsoModalOpen] = useState(false);
   const [isUploadModalOpen, setIsUploadModalOpen] = useState(false);
+  const [alertConfig, setAlertConfig] = useState<{ isOpen: boolean; type: ModalType; title: string; message: string }>({ isOpen: false, type: 'info', title: '', message: '' });
+
+  const showAlert = (title: string, message: string, type: ModalType = 'info') => {
+    setAlertConfig({ isOpen: true, title, message, type });
+  };
+  const closeAlert = () => {
+    setAlertConfig(prev => ({ ...prev, isOpen: false }));
+  };
 
   // Add ISO to DB form state
   const [newName, setNewName] = useState('');
@@ -50,7 +59,7 @@ export default function OSBibliotheque() {
       fetchData();
       setNewName(''); setNewFilename(''); setOsVersion(''); setNewDesc('');
     } catch (err) {
-      alert("Erreur lors de l'ajout de l'ISO");
+      showAlert('Erreur', "Erreur lors de l'ajout de l'ISO", 'error');
     }
   };
 
@@ -304,6 +313,7 @@ export default function OSBibliotheque() {
           onSuccess={() => { fetchData(); }}
         />
       )}
+      <Modal {...alertConfig} onClose={closeAlert} />
     </div>
   );
 }

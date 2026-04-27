@@ -1,6 +1,7 @@
 "use client";
 import React, { useState, useEffect } from 'react';
 import { adminService } from '../../../services/admin';
+import Modal, { ModalType } from '@/app/components/Modal';
 
 export default function Noeuds() {
   const [nodes, setNodes] = useState<any[]>([]);
@@ -9,6 +10,14 @@ export default function Noeuds() {
   const [newName, setNewName] = useState('');
   const [newIp, setNewIp] = useState('');
   const [newRam, setNewRam] = useState('128 Go');
+  const [alertConfig, setAlertConfig] = useState<{ isOpen: boolean; type: ModalType; title: string; message: string }>({ isOpen: false, type: 'info', title: '', message: '' });
+
+  const showAlert = (title: string, message: string, type: ModalType = 'info') => {
+    setAlertConfig({ isOpen: true, title, message, type });
+  };
+  const closeAlert = () => {
+    setAlertConfig(prev => ({ ...prev, isOpen: false }));
+  };
 
   useEffect(() => {
     async function fetchNodes() {
@@ -27,7 +36,7 @@ export default function Noeuds() {
   const handleAddNode = (e: React.FormEvent) => {
     e.preventDefault();
     // Logique de création de mapping (simulation pour l'instant)
-    alert("L'enregistrement d'un nouveau nœud nécessite une configuration physique de l'hyperviseur.");
+    showAlert('Information', "L'enregistrement d'un nouveau nœud nécessite une configuration physique de l'hyperviseur.", 'info');
     setIsModalOpen(false);
   };
 
@@ -143,6 +152,7 @@ export default function Noeuds() {
           </div>
         </div>
       )}
+      <Modal {...alertConfig} onClose={closeAlert} />
     </div>
   )
 }

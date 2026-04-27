@@ -2,8 +2,9 @@
 import { useParams, useRouter } from 'next/navigation';
 import { useState } from 'react';
 import { useVMs } from '../../VMContext';
-import { vmService } from '@/services/vms';
+import Modal, { ModalType } from '@/app/components/Modal';
 import { Icon } from '@/components/Icon';
+import { vmService } from '@/services/vms';
 
 export default function VMDetails() {
   const params = useParams();
@@ -15,12 +16,38 @@ export default function VMDetails() {
   const [editValue, setEditValue] = useState<string>('');
 
   const vm = vms.find(v => v.id === vmid);
+  const isRunning = vm?.status === 'running';
 
-  if (!vm) return <VMNotFound vmid={vmid} onBack={() => router.push('/dashboard/mes-vms')} />;
+  if (!vm) {
+    return (
+      <div className="page active" style={{ padding: '20px' }}>
+        <h2 style={{ fontSize: '24px', fontWeight: 'bold', marginBottom: '20px' }}>VM introuvable</h2>
+        <p>La machine virtuelle avec l'identifiant {vmid} n'existe pas ou a été supprimée.</p>
+        <button className="btn-ghost" onClick={() => router.push('/dashboard/mes-vms')} style={{ marginTop: '20px' }}>Retour</button>
+      </div>
+    );
+  }
 
-  const isRunning = ['ACTIVE', 'running', 'on'].includes(vm.status);
+  const [isConfirmOpen, setIsConfirmOpen] = useState(false);
+  const [alertConfig, setAlertConfig] = useState<{ isOpen: boolean; type: ModalType; title: string; message: string }>({ isOpen: false, type: 'info', title: '', message: '' });
 
-  const handleEdit = (field: string, val: any) => {
+  const showAlert = (title: string, message: string, type: ModalType = 'info') => {
+    setAlertConfig({ isOpen: true, title, message, type });
+  };
+  const closeAlert = () => {
+    setAlertConfig(prev => ({ ...prev, isOpen: false }));
+  };
+
+  const handleDelete = () => {
+    setIsConfirmOpen(true);
+  };
+
+  const confirmDelete = () => {
+    deleteVM(vm.id);
+    router.push('/dashboard/mes-vms');
+  };
+
+  const startEdit = (field: string, currentValue: string | number) => {
     setEditingField(field);
     setEditValue(String(val));
   };
@@ -44,10 +71,10 @@ export default function VMDetails() {
       a.click();
       window.URL.revokeObjectURL(url);
       document.body.removeChild(a);
-      alert("Clé SSH téléchargée avec succès. Elle a été supprimée du serveur.");
+      showAlert('Succès', "Clé SSH téléchargée avec succès. Elle a été supprimée du serveur.", 'success');
       refreshVMs();
     } catch (error: any) {
-      alert(error.response?.data?.detail || "Erreur lors du téléchargement.");
+      showAlert('Erreur', error.response?.data?.detail || "Erreur lors du téléchargement.", 'error');
     }
   };
 
@@ -75,18 +102,13 @@ export default function VMDetails() {
             <Icon name="console" strokeWidth={2.5} />
             Console VNC
           </button>
-          
-          <ActionButtons 
-            isRunning={isRunning} 
-            onStart={() => startVM(vm.id)} 
-            onStop={() => stopVM(vm.id)} 
-            onReboot={() => rebootVM(vm.id)} 
-            onDelete={() => {
-              if (confirm("Supprimer cette VM ?")) {
-                deleteVM(vm.id);
-                router.push('/dashboard/mes-vms');
-              }
-            }}
+
+          <ActionButtons
+            isRunning={isRunning}
+            onStart={() => startVM(vm.id)}
+            onStop={() => stopVM(vm.id)}
+            onReboot={() => rebootVM(vm.id)}
+            onDelete={handleDelete}
           />
         </div>
       </div>
@@ -117,6 +139,17 @@ export default function VMDetails() {
 
         <SSHCard ip={vm.ip_address} hasKey={!!vm.ssh_public_key} onDownload={downloadKey} />
       </div>
+
+      <Modal {...alertConfig} onClose={closeAlert} />
+      <Modal
+        isOpen={isConfirmOpen}
+        type="confirm"
+        title="Supprimer la VM"
+        message={`Êtes-vous sûr de vouloir supprimer la VM ${vm.name} ?`}
+        confirmText="Supprimer"
+        onClose={() => setIsConfirmOpen(false)}
+        onConfirm={confirmDelete}
+      />
     </div>
   );
 }
@@ -158,14 +191,14 @@ function EditableRow({ label, value, field, editingField, editValue, onEdit, onS
       <div className="detail-label">{label}</div>
       <div className="detail-value">
         {isEditing ? (
-          <input 
-            className="pm-input" 
-            type={type} 
-            style={{ padding: '4px 8px', width: '120px', height: '28px' }} 
-            value={editValue} 
-            onChange={e => onChange(e.target.value)} 
-            onBlur={onSave} 
-            autoFocus 
+          <input
+            className="pm-input"
+            type={type}
+            style={{ padding: '4px 8px', width: '120px', height: '28px' }}
+            value={editValue}
+            onChange={e => onChange(e.target.value)}
+            onBlur={onSave}
+            autoFocus
           />
         ) : (
           <span onClick={() => onEdit(field, value)} style={{ cursor: 'pointer', borderBottom: '1px dashed rgba(255,255,255,0.2)' }}>{value}</span>
