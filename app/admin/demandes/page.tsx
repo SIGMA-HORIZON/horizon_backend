@@ -21,6 +21,7 @@ export default function DemandesComptes() {
     const [rejectReason, setRejectReason] = useState('');
     const [isRejectModalOpen, setIsRejectModalOpen] = useState(false);
     const [isApproveModalOpen, setIsApproveModalOpen] = useState(false);
+    const [isSubmitting, setIsSubmitting] = useState(false);
     const [alertConfig, setAlertConfig] = useState<{ isOpen: boolean; type: ModalType; title: string; message: string }>({ isOpen: false, type: 'info', title: '', message: '' });
 
     const showAlert = (title: string, message: string, type: ModalType = 'info') => {
@@ -62,7 +63,8 @@ export default function DemandesComptes() {
     };
 
     const handleReject = async () => {
-        if (!selectedRequest || !rejectReason) return;
+        if (!selectedRequest || !rejectReason || isSubmitting) return;
+        setIsSubmitting(true);
         try {
             await accountService.rejectRequest(selectedRequest.id, rejectReason);
             showAlert('Succès', `La demande de ${selectedRequest.first_name} a été rejetée`, 'success');
@@ -73,6 +75,8 @@ export default function DemandesComptes() {
         } catch (error) {
             console.error('Error rejecting request:', error);
             showAlert('Erreur', 'Erreur lors du rejet', 'error');
+        } finally {
+            setIsSubmitting(false);
         }
     };
 
@@ -190,9 +194,10 @@ export default function DemandesComptes() {
                                 </button>
                                 <button
                                     onClick={handleApprove}
-                                    style={{ padding: '10px 18px', background: '#2563EB', border: 'none', color: '#fff', borderRadius: '8px', fontSize: '14px', fontWeight: 600, cursor: 'pointer' }}
+                                    disabled={isSubmitting}
+                                    style={{ padding: '10px 18px', background: '#2563EB', border: 'none', color: '#fff', borderRadius: '8px', fontSize: '14px', fontWeight: 600, cursor: 'pointer', opacity: isSubmitting ? 0.7 : 1 }}
                                 >
-                                    Confirmer l'approbation
+                                    {isSubmitting ? 'En cours...' : "Confirmer l'approbation"}
                                 </button>
                             </div>
                         </div>
@@ -233,10 +238,10 @@ export default function DemandesComptes() {
                                 </button>
                                 <button
                                     onClick={handleReject}
-                                    disabled={!rejectReason}
-                                    style={{ padding: '10px 18px', background: '#EF4444', border: 'none', color: '#fff', borderRadius: '8px', fontSize: '14px', fontWeight: 600, cursor: 'pointer', opacity: !rejectReason ? 0.5 : 1 }}
+                                    disabled={!rejectReason || isSubmitting}
+                                    style={{ padding: '10px 18px', background: '#EF4444', border: 'none', color: '#fff', borderRadius: '8px', fontSize: '14px', fontWeight: 600, cursor: 'pointer', opacity: (!rejectReason || isSubmitting) ? 0.5 : 1 }}
                                 >
-                                    Confirmer le rejet
+                                    {isSubmitting ? 'En cours...' : 'Confirmer le rejet'}
                                 </button>
                             </div>
                         </div>
