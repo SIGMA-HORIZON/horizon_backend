@@ -36,7 +36,7 @@ class VMCreateRequest(BaseModel):
 
 class ProxmoxCreateVMRequest(BaseModel):
     vmid: int = Field(..., ge=100)
-    node: str
+    node: str | None = None
     storage: str = "local-lvm"
     iso_storage: str | None = Field(default=None)
     iso_filename: str
@@ -74,6 +74,8 @@ class VMResponse(BaseModel):
     ssh_public_key: str | None = None
     cpu_usage: float | None = 0.0
     ram_usage: float | None = 0.0
+    os_name: str | None = None
+    os_family: str | None = None
 
     @field_validator("status", mode="before")
     @classmethod

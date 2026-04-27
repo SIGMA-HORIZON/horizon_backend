@@ -315,10 +315,10 @@ async def check_proxmox_health() -> schemas.ProxmoxHealthResponse:
     try:
         client = ProxmoxClient()
         # On utilise un appel léger pour vérifier la santé
-        nodes = client._api.nodes.get()
+        nodes = client.api.nodes.get()
         nodes_up = sum(1 for n in nodes if n.get("status") == "online")
         return schemas.ProxmoxHealthResponse(
-            online=True,
+            online=nodes_up > 0,
             nodes_up=nodes_up,
             nodes_total=len(nodes)
         )

@@ -251,6 +251,10 @@ class ProxmoxClient:
         ssh_key: str | None = None,
     ) -> dict[str, Any]:
         """Crée une VM directement à partir d'un ISO (sans template)."""
+        if not node:
+            logger.error("create_vm call failed: 'node' parameter is empty or None")
+            raise ProxmoxIntegrationError("Le nom du nœud Proxmox ne peut pas être vide.", 400)
+        
         try:
             n = self._nodes(node)
             iso_path_storage = iso_storage or "nfs-shared-iso"
@@ -278,7 +282,7 @@ class ProxmoxClient:
             if ssh_key:
                 parts = ssh_key.strip().split()
                 clean_key = f"{parts[0]} {parts[1]}" if len(parts) >= 2 else ssh_key.strip()
-                config_params["sshkeys"] = clean_key
+                config_params["sshkeys"] = urllib.parse.quote(clean_key, safe="")
 
             host = self._settings.PROXMOX_HOST
             port = self._settings.PROXMOX_PORT
@@ -609,3 +613,36 @@ class ProxmoxClient:
         except Exception as e:
             logger.exception("get_cluster_status")
             raise ProxmoxIntegrationError(str(e), 502) from e
+    def get_nodes_resources(self, storage_name: str = "local-lvm") -> list[dict[str, Any]]:
+        """Récupère les ressources détaillées (CPU, RAM, Disque) de chaque nœud pour le scheduling."""
+        try:
+            all_nodes = self.api.nodes.get()
+            results = []
+            for node in all_nodes:
+                if node["status"] != "online":
+                    continue
+                
+                nodename = node["node"]
+                # On tente de récupérer les infos de stockage sur ce nœud
+                storage_info = {}
+                try:
+                    storage = self.api.nodes(nodename).storage(storage_name).status.get()
+                    storage_info = {
+                        "total": storage.get("total", 0),
+                        "used": storage.get("used", 0),
+                        "free": storage.get("avail", 0)
+                    }
+                except Exception:
+                    storage_info = {"total": 0, "used": 0, "free": 0}
+
+                results.append({
+                    "name": nodename,
+                    "status": node["status"],
+                    "cpu_usage": node.get("cpu", 0),
+                    "ram_free": node.get("maxmem", 0) - node.get("mem", 0),
+                    "storage_free": storage_info.get("free", 0)
+                })
+            return results
+        except Exception as e:
+            logger.error(f"Erreur lors de la récupération des ressources nœuds : {e}")
+            return []

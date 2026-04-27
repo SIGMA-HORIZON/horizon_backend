@@ -83,6 +83,9 @@ class Settings(BaseSettings):
     PROXMOX_TIMEOUT: int = 120
     # If true, Horizon will attempt to delete VMs from Proxmox and the DB immediately when they expire
     PROXMOX_DELETE_ON_EXPIRY: bool = True
+    # root@pam credentials for VNC WebSocket session authentication (API tokens cannot auth vncwebsocket)
+    PROXMOX_ROOT_USER: str = "root@pam"
+    PROXMOX_ROOT_PASSWORD: str = ""
 
 
 @lru_cache

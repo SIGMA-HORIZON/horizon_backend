@@ -1,7 +1,10 @@
 import uuid
 from uuid import UUID
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, WebSocket
 from sqlalchemy.orm import Session
+import logging
+
+logger = logging.getLogger(__name__)
 
 from horizon.core.config import get_settings
 from horizon.features.vms import schemas
@@ -20,28 +23,49 @@ router = APIRouter(prefix="/vms", tags=["Machines Virtuelles"])
 @router.get("/cluster-status", summary="État rapide du cluster (tous les utilisateurs authentifiés)")
 async def get_cluster_status(current_user: CurrentUser):
     """
-    Retourne uniquement le statut online/offline du cluster et le nombre de nœuds,
-    sans exposer les noms des nœuds ni la topologie de l'infrastructure.
-    Utilise un appel direct à l'API Proxmox pour éviter tout état mis en cache.
+    Retourne un état détaillé du cluster Proxmox accessible à tout utilisateur.
+    Utilise ProxmoxClient.get_cluster_status() pour récupérer les stats globales (VMs, CPU, RAM).
     """
-    from horizon.core.config import get_settings
     from horizon.infrastructure.proxmox_client import ProxmoxClient
 
     settings = get_settings()
     if not settings.PROXMOX_ENABLED:
-        return {"online": False, "total_nodes": 0, "online_nodes": 0}
+        return {
+            "online": False,
+            "total_nodes": 0,
+            "online_nodes": 0,
+            "active_vms": 0,
+            "total_vms": 0,
+            "total_cpus": 0,
+            "total_memory": 0
+        }
     try:
         client = ProxmoxClient()
-        # Appel direct — lève une exception si Proxmox est inaccessible
-        nodes = client.api.nodes.get()
+        status = client.get_cluster_status()
+        
+        # On calcule online/offline à partir des nœuds retournés
+        nodes = status.get("nodes", [])
         online_nodes = sum(1 for n in nodes if n.get("status") == "online")
+        
         return {
             "online": online_nodes > 0,
             "total_nodes": len(nodes),
             "online_nodes": online_nodes,
+            "active_vms": status.get("active_vms", 0),
+            "total_vms": status.get("total_vms", 0),
+            "total_cpus": status.get("total_cpus", 0),
+            "total_memory": status.get("total_memory", 0)
         }
     except Exception:
-        return {"online": False, "total_nodes": 0, "online_nodes": 0}
+        return {
+            "online": False,
+            "total_nodes": 0,
+            "online_nodes": 0,
+            "active_vms": 0,
+            "total_vms": 0,
+            "total_cpus": 0,
+            "total_memory": 0
+        }
 
 
 @router.get("/available-isos", summary="Lister les images ISO disponibles")
@@ -96,10 +120,29 @@ async def admin_create_proxmox_vm(
     summary="Lister mes VMs",
 )
 def list_vms(current_user: CurrentUser, db: Session = Depends(get_db)):
+    from datetime import datetime, timezone
     rows = vm_service.get_user_vms(db, current_user.id)
-    return schemas.VMListResponse(
-        items=[schemas.VMResponse.model_validate(r) for r in rows]
-    )
+    items = []
+    now = datetime.now(timezone.utc)
+    
+    for r in rows:
+        # Local check for expiry to ensure immediate consistency in lists
+        lease_end = r.lease_end
+        if lease_end.tzinfo is None:
+            lease_end = lease_end.replace(tzinfo=timezone.utc)
+            
+        if lease_end <= now and r.status != VMStatus.EXPIRED:
+            r.status = VMStatus.EXPIRED
+            r.stopped_at = now
+            db.commit()
+            logger.info(f"List: VM {r.id} detected as EXPIRED locally.")
+            
+        resp = schemas.VMResponse.model_validate(r)
+        if r.iso_image:
+            resp.os_name = r.iso_image.name
+            resp.os_family = r.iso_image.os_family.value if hasattr(r.iso_image.os_family, 'value') else r.iso_image.os_family
+        items.append(resp)
+    return schemas.VMListResponse(items=items)
 
 
 @router.get("/{vm_id}/console")
@@ -110,6 +153,7 @@ async def get_vm_console(
 ):
     vm = vm_service._get_vm_or_404(db, vm_id)
     enforce_vm_ownership(vm.owner_id, current_user.id, current_user.role.value)
+    vm_service.enforce_vm_active_lease(vm)
 
     from horizon.infrastructure.proxmox_client import ProxmoxClient
     client = ProxmoxClient()
@@ -128,6 +172,149 @@ async def get_vm_console(
         raise HTTPException(status_code=502, detail=str(e))
 
 
+@router.websocket("/vnc/{vm_id}")
+async def vnc_proxy_websocket(
+    websocket: WebSocket,
+    vm_id: str,
+    port: str,
+    ticket: str,
+    db: Session = Depends(get_db),
+):
+    """
+    WebSocket proxy for VNC console.
+    Forwards the browser connection to the Proxmox VNC WebSocket endpoint.
+    """
+    # noVNC requests the 'binary' subprotocol — we must acknowledge it
+    await websocket.accept(subprotocol="binary")
+
+    try:
+        # 1. Look up VM in the database
+        from horizon.infrastructure.vnc_proxy import proxy_vnc
+        vm_uuid = uuid.UUID(vm_id)
+        vm = db.query(VirtualMachine).filter(VirtualMachine.id == vm_uuid).first()
+        if not vm:
+            logger.error(f"VNC: VM {vm_id} not found")
+            await websocket.close(code=1008, reason="VM not found")
+            return
+        
+        # 1b. Expiry check
+        try:
+            vm_service.enforce_vm_active_lease(vm)
+        except Exception as e:
+            await websocket.close(code=1008, reason=str(e))
+            return
+
+        # 2. Resolve the Proxmox node name
+        _settings = get_settings()
+        try:
+            px_node = _resolve_proxmox_node_name(db, vm.node)
+        except Exception as e:
+            logger.error(f"VNC: node resolution failed for VM {vm_id}: {e}")
+            px_node = _settings.PROXMOX_NODE or "pve1"
+
+        logger.info(f"VNC proxy: vmid={vm.proxmox_vmid} node={px_node} port={port}")
+
+        # 3. Start the proxy (ticket arrives URL-decoded from FastAPI query params)
+        await proxy_vnc(
+            websocket=websocket,
+            proxmox_host=_settings.PROXMOX_HOST,
+            node=px_node,
+            vmid=vm.proxmox_vmid,
+            port=port,
+            ticket=ticket,
+            root_user=_settings.PROXMOX_ROOT_USER,
+            root_password=_settings.PROXMOX_ROOT_PASSWORD,
+            verify_ssl=_settings.PROXMOX_VERIFY_SSL,
+        )
+
+    except Exception as e:
+        logger.error(f"VNC WebSocket Error for {vm_id}: {e}", exc_info=True)
+        try:
+            await websocket.close(code=1011)
+        except Exception:
+            pass
+
+
+@router.websocket("/ssh/{vm_id}")
+async def ssh_proxy_websocket(
+    websocket: WebSocket,
+    vm_id: str,
+    token: str = None,
+    db: Session = Depends(get_db),
+):
+    """
+    WebSocket proxy for SSH terminal.
+    """
+    await websocket.accept()
+
+    try:
+        # 1. Auth check
+        if not token:
+            await websocket.close(code=1008, reason="Authentication required")
+            return
+        
+        from horizon.features.auth.service import get_user_from_token
+        try:
+            current_user = get_user_from_token(db, token)
+        except Exception:
+            await websocket.close(code=1008, reason="Invalid token")
+            return
+
+        # 2. Look up VM
+        from horizon.infrastructure.ssh_proxy import proxy_ssh
+        vm_uuid = uuid.UUID(vm_id)
+        vm = db.query(VirtualMachine).filter(VirtualMachine.id == vm_uuid).first()
+        if not vm:
+            await websocket.close(code=1008, reason="VM not found")
+            return
+        
+        # 3. Ownership check
+        try:
+            enforce_vm_ownership(vm.owner_id, current_user.id, current_user.role.value)
+            vm_service.enforce_vm_active_lease(vm)
+        except Exception as e:
+            await websocket.close(code=1008, reason=str(e))
+            return
+
+        if not vm.ip_address:
+            # Try to refresh IP
+            from horizon.infrastructure.proxmox_client import ProxmoxClient
+            client = ProxmoxClient()
+            if client.enabled:
+                px_node = _resolve_proxmox_node_name(db, vm.node)
+                ips = client.get_vm_ips(px_node, vm.proxmox_vmid)
+                if ips:
+                    vm.ip_address = ips[0]
+                    db.commit()
+            
+            if not vm.ip_address:
+                await websocket.close(code=1011, reason="VM has no IP address")
+                return
+
+        # 4. Determine credentials
+        username = 'user' if vm.os_family != 'WINDOWS' else 'Administrator'
+        # If the VM has an os_name that implies a different user, we could refine this.
+        
+        # Check if we have a stored private key (for download)
+        pkey = vm.ssh_public_key if vm.ssh_public_key and "-----BEGIN" in vm.ssh_public_key else None
+        
+        logger.info(f"SSH Terminal: Connecting to {vm.ip_address} for user {current_user.email}")
+        
+        await proxy_ssh(
+            websocket=websocket,
+            host=vm.ip_address,
+            username=username,
+            private_key_str=pkey
+        )
+
+    except Exception as e:
+        logger.error(f"SSH WebSocket Error for {vm_id}: {e}", exc_info=True)
+        try:
+            await websocket.close(code=1011)
+        except Exception:
+            pass
+
+
 @router.get("/{vm_id}", response_model=schemas.VMResponse, summary="Détail d'une VM")
 def get_vm(vm_id: uuid.UUID, current_user: CurrentUser, db: Session = Depends(get_db)):
     vm = db.query(VirtualMachine).filter(VirtualMachine.id == vm_id).first()
@@ -135,7 +322,10 @@ def get_vm(vm_id: uuid.UUID, current_user: CurrentUser, db: Session = Depends(ge
         raise PolicyError("VM", "VM introuvable.", 404)
     enforce_vm_ownership(vm.owner_id, current_user.id, current_user.role.value)
 
-    # Auto-refresh IP if missing and VM is active
+    # Synchroniser l'état avec Proxmox (IP, Status, Stats)
+    vm = vm_service.refresh_vm_status(db, vm_id, current_user.id, current_user.role.value)
+
+    # Attacher les stats dynamiques (non persistées en DB)
     if vm.status == VMStatus.ACTIVE:
         from horizon.infrastructure.proxmox_client import ProxmoxClient
         try:
@@ -144,22 +334,19 @@ def get_vm(vm_id: uuid.UUID, current_user: CurrentUser, db: Session = Depends(ge
                 px_node = _resolve_proxmox_node_name(db, vm.node)
                 status = client.get_vm_current_status(px_node, vm.proxmox_vmid)
                 
-                # Attacher les stats dynamiques (non persistées en DB)
                 vm.cpu_usage = round(status.get("cpu", 0) * 100, 1)
                 mem_used = status.get("mem", 0)
                 mem_max = status.get("maxmem", 1)
                 vm.ram_usage = round((mem_used / mem_max) * 100, 1)
-                
-                # Refresh IP si manquante
-                if not vm.ip_address:
-                    ips = client.get_vm_ips(px_node, vm.proxmox_vmid)
-                    if ips:
-                        vm.ip_address = ips[0]
-                        db.commit()
         except Exception:
             pass
 
-    return vm
+    resp = schemas.VMResponse.model_validate(vm)
+    if vm.iso_image:
+        resp.os_name = vm.iso_image.name
+        resp.os_family = vm.iso_image.os_family.value if hasattr(vm.iso_image.os_family, 'value') else vm.iso_image.os_family
+    
+    return resp
 
 
 @router.patch(

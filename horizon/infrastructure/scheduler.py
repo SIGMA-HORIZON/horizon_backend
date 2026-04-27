@@ -47,7 +47,7 @@ def task_expire_vms():
         vms_expired = (
             db.query(VirtualMachine)
             .filter(
-                VirtualMachine.status == VMStatus.ACTIVE,
+                VirtualMachine.status.in_([VMStatus.ACTIVE, VMStatus.STOPPED, VMStatus.SUSPENDED, VMStatus.PENDING]),
                 VirtualMachine.lease_end <= now,
             )
             .all()

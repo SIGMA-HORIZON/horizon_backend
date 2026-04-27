@@ -1,5 +1,6 @@
 """Cycle de vie des VMs."""
 
+import logging
 import uuid
 from datetime import datetime, timedelta, timezone
 
@@ -31,6 +32,23 @@ from horizon.shared.policies.enforcer import (
     enforce_vm_ownership,
     enforce_vm_resource_limits,
 )
+
+def enforce_vm_active_lease(vm: VirtualMachine) -> None:
+    """Vérifie si la session de la VM n'est pas expirée."""
+    now = datetime.now(timezone.utc)
+    # Ensure lease_end has timezone info if it doesn't (though it should in DB)
+    lease_end = vm.lease_end
+    if lease_end.tzinfo is None:
+        lease_end = lease_end.replace(tzinfo=timezone.utc)
+        
+    if lease_end <= now:
+        raise PolicyError(
+            "POL-RESSOURCES-01",
+            f"La session de cette VM a expiré le {vm.lease_end.strftime('%d/%m/%Y %H:%M')}. "
+            "Veuillez prolonger la session ou contacter un administrateur.",
+            403,
+        )
+logger = logging.getLogger(__name__)
 
 
 def _resolve_proxmox_node_name(db: Session, physical_node: PhysicalNode) -> str:
@@ -233,9 +251,30 @@ async def create_vm_directly(db: Session, owner_id, body: schemas.ProxmoxCreateV
 
     now = datetime.now(timezone.utc)
 
-    # Resolve physical node
+    # 1. Automate Node Selection (Scheduler)
+    target_node = "pve1"  # Default fallback
+    try:
+        client = ProxmoxClient()
+        if client.enabled:
+            nodes_info = client.get_nodes_resources(body.storage)
+            if nodes_info:
+                # Sort nodes by free storage (descending)
+                sorted_nodes = sorted(nodes_info, key=lambda x: x["storage_free"], reverse=True)
+                if sorted_nodes and sorted_nodes[0]["storage_free"] > 0:
+                    target_node = sorted_nodes[0]["name"]
+                    logger.info(f"Scheduler picked node {target_node} with {sorted_nodes[0]['storage_free']} bytes free.")
+    except Exception as e:
+        logger.warning(f"Scheduler failed, falling back to {target_node}: {e}")
+
+    logger.info(f"Direct VM Creation - target_node: {target_node}, storage: {body.storage}, vmid: {body.vmid}")
+
+    # If body.node was provided (e.g. by an admin via API directly), respect it.
+    if body.node:
+        target_node = body.node
+
+    # Resolve physical node for DB record
     mapping = db.query(ProxmoxNodeMapping).filter(
-        ProxmoxNodeMapping.proxmox_node_name == body.node
+        ProxmoxNodeMapping.proxmox_node_name == target_node
     ).first()
     physical_node = mapping.physical_node if mapping else PhysicalNode.REM
 
@@ -260,9 +299,24 @@ async def create_vm_directly(db: Session, owner_id, body: schemas.ProxmoxCreateV
         lease_end=now + timedelta(hours=body.session_hours),
         vlan_id=None,
         ip_address=None,
-        ssh_public_key=body.ssh_public_key,
+        ssh_public_key=None, # Will be set below
         shared_space_gb=0.0,
     )
+    
+    # Gestion des clés SSH pour création directe
+    user_ssh_key = (body.ssh_public_key or "").strip()
+    if user_ssh_key:
+        if not user_ssh_key.startswith(("ssh-rsa", "ssh-ed25519", "ecdsa-sha2")):
+            raise PolicyError("POL-RESSOURCES-02", "La clé SSH fournie n'est pas une clé publique valide.", 422)
+        vm.ssh_public_key = None # On ne stocke pas la clé publique de l'utilisateur pour téléchargement
+        public_key_to_inject = user_ssh_key
+    else:
+        # On génère une clé seulement si ce n'est pas fourni
+        from horizon.infrastructure.ssh_utils import generate_ssh_key_pair
+        private_key, public_key = generate_ssh_key_pair()
+        vm.ssh_public_key = private_key # Stockage pour téléchargement unique
+        public_key_to_inject = public_key
+
     db.add(vm)
 
     reservation = Reservation(
@@ -280,23 +334,25 @@ async def create_vm_directly(db: Session, owner_id, body: schemas.ProxmoxCreateV
         try:
             client = ProxmoxClient()
         except ProxmoxIntegrationError as e:
+            logger.error(f"Failed to init ProxmoxClient: {e}")
             raise PolicyError("PROXMOX", e.message, e.status_code) from e
 
+        logger.info(f"Initiating Proxmox call: node={target_node}, vmid={body.vmid}, name={body.name}")
         try:
             res = await client.create_vm(
-                node=body.node,
+                node=target_node,
                 vmid=body.vmid,
                 name=body.name,
-                storage=body.storage,
+                storage=body.storage or "local-lvm",
                 iso_filename=body.iso_filename,
                 vcpu=body.vcpu,
                 ram_mb=body.ram_mb,
                 storage_gb=body.storage_gb,
                 iso_storage=body.iso_storage,
                 net0=body.net0,
-                ssh_key=body.ssh_public_key,
+                ssh_key=public_key_to_inject,
             )
-            await client.start_vm(node=body.node, vmid=body.vmid)
+            await client.start_vm(node=target_node, vmid=body.vmid)
         except ProxmoxIntegrationError as e:
             raise PolicyError("PROXMOX", e.message, e.status_code) from e
 
@@ -326,6 +382,7 @@ async def stop_vm(db: Session, vm_id, requesting_user_id, user_role: str, force:
 
     if not force:
         enforce_vm_ownership(vm.owner_id, requesting_user_id, user_role)
+        enforce_vm_active_lease(vm)
 
     if vm.status == VMStatus.STOPPED:
         raise PolicyError("VM", "Cette VM est déjà arrêtée.", 409)
@@ -359,6 +416,7 @@ async def start_vm(db: Session, vm_id, requesting_user_id, user_role: str) -> No
 
     vm = _get_vm_or_404(db, vm_id)
     enforce_vm_ownership(vm.owner_id, requesting_user_id, user_role)
+    enforce_vm_active_lease(vm)
 
     if vm.status == VMStatus.ACTIVE:
         # On vérifie si elle est "vraiment" active sur Proxmox ou si c'est juste le statut DB
@@ -414,6 +472,7 @@ async def delete_vm(db: Session, vm_id, requesting_user_id, user_role: str) -> N
 def update_vm(db: Session, vm_id, requesting_user_id, user_role: str, data: dict) -> VirtualMachine:
     vm = _get_vm_or_404(db, vm_id)
     enforce_vm_ownership(vm.owner_id, requesting_user_id, user_role)
+    enforce_vm_active_lease(vm)
 
     quota = get_effective_quota(db, vm.owner_id)
 
@@ -493,23 +552,71 @@ def get_user_vms(db: Session, user_id) -> list[VirtualMachine]:
 
 
 def refresh_vm_status(db: Session, vm_id: uuid.UUID, user_id: uuid.UUID, user_role: str) -> VirtualMachine:
+    """
+    Synchronise l'état de la VM entre Proxmox et la base de données.
+    Met à jour le statut (ACTIVE/STOPPED) et l'IP si possible.
+    """
     vm = _get_vm_or_404(db, vm_id)
     enforce_vm_ownership(vm.owner_id, user_id, user_role)
     
     from horizon.infrastructure.proxmox_client import ProxmoxClient, ProxmoxIntegrationError
     
     try:
+        # 0. Local Expiry Check
+        now = datetime.now(timezone.utc)
+        lease_end = vm.lease_end
+        if lease_end.tzinfo is None:
+            lease_end = lease_end.replace(tzinfo=timezone.utc)
+            
+        if lease_end <= now and vm.status != VMStatus.EXPIRED:
+            vm.status = VMStatus.EXPIRED
+            vm.stopped_at = now
+            db.commit()
+            logger.info(f"Sync: VM {vm.id} detected as EXPIRED locally.")
+            return vm
+
         client = ProxmoxClient()
-        if client.enabled and vm.status == VMStatus.ACTIVE:
+        if client.enabled:
             px_node = _resolve_proxmox_node_name(db, vm.node)
-            ips = client.get_vm_ips(px_node, vm.proxmox_vmid)
-            if ips:
-                vm.ip_address = ips[0]
+            
+            # 1. Sync Status
+            try:
+                px_status = client.get_vm_current_status(px_node, vm.proxmox_vmid)
+                qemu_status = px_status.get("status") # 'running', 'stopped', 'paused'
+                
+                if qemu_status == "running" and vm.status != VMStatus.ACTIVE:
+                    vm.status = VMStatus.ACTIVE
+                    logger.info(f"Sync: VM {vm.id} set to ACTIVE (was {vm.status})")
+                elif qemu_status == "stopped" and vm.status != VMStatus.STOPPED:
+                    vm.status = VMStatus.STOPPED
+                    if not vm.stopped_at:
+                        vm.stopped_at = now
+                    logger.info(f"Sync: VM {vm.id} set to STOPPED (was {vm.status})")
+                elif qemu_status == "paused" and vm.status != VMStatus.SUSPENDED:
+                    vm.status = VMStatus.SUSPENDED
+                    logger.info(f"Sync: VM {vm.id} set to SUSPENDED (was {vm.status})")
+                    
+                # 2. Sync IP if Active
+                if qemu_status == "running":
+                    ips = client.get_vm_ips(px_node, vm.proxmox_vmid)
+                    if ips:
+                        vm.ip_address = ips[0]
+                
                 db.commit()
                 db.refresh(vm)
-    except ProxmoxIntegrationError:
-        # On ignore les erreurs Proxmox lors d'un refresh passif
-        pass
+            except ProxmoxIntegrationError as e:
+                # Si la VM n'existe pas sur Proxmox, elle doit être STOPPED ou EXPIRED
+                if "does not exist" in str(e).lower() or "404" in str(e):
+                    if vm.status == VMStatus.ACTIVE:
+                        vm.status = VMStatus.STOPPED
+                        vm.stopped_at = now
+                        db.commit()
+                        logger.warning(f"Sync: VM {vm.id} not found on Proxmox, set to STOPPED.")
+                else:
+                    logger.warning(f"Failed to sync status for VM {vm.id}: {e}")
+                
+    except Exception as e:
+        logger.error(f"Error in refresh_vm_status for VM {vm.id}: {e}")
         
     return vm
 
