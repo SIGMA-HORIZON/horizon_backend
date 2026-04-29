@@ -6,6 +6,9 @@ from logging.config import fileConfig
 
 from alembic import context
 from sqlalchemy import engine_from_config, pool
+from dotenv import load_dotenv
+
+load_dotenv()
 
 # Racine du dépôt sur le path pour importer horizon.*
 _REPO_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", ".."))

@@ -312,7 +312,7 @@ class ProxmoxClient:
         return []
 
     async def upload_iso(self, node: str, storage: str, file_obj, filename: str) -> dict[str, Any]:
-        """Upload un fichier ISO sur un stockage spécifique via requests direct."""
+        """Upload un fichier ISO sur un stockage spécifique via requests_toolbelt streaming."""
         if not self._settings.PROXMOX_ENABLED:
             raise ProxmoxIntegrationError("Proxmox désactivé.", 503)
 
@@ -322,52 +322,38 @@ class ProxmoxClient:
         tn = self._settings.PROXMOX_TOKEN_NAME
         tv = self._settings.PROXMOX_TOKEN_VALUE
 
-        # Consolider host:port
         host_str = f"{h}:{p}" if p else h
         url = f"https://{host_str}/api2/json/nodes/{node}/storage/{storage}/upload"
-
-        # Tenter de déterminer la taille du fichier pour éviter le chunked encoding
-        size = None
-        try:
-            if hasattr(file_obj, 'fileno'):
-                size = os.fstat(file_obj.fileno()).st_size
-            elif hasattr(file_obj, 'seek') and hasattr(file_obj, 'tell'):
-                file_obj.seek(0, 2)
-                size = file_obj.tell()
-                file_obj.seek(0)
-        except Exception:
-            logger.warning("Impossible de déterminer la taille du fichier ISO.")
 
         headers = {
             "Authorization": f"PVEAPIToken={u}!{tn}={tv}",
             "Connection": "keep-alive"
         }
 
-        data = {
-            "content": "iso"
-        }
-
         try:
+            from requests_toolbelt.multipart.encoder import MultipartEncoder
+            
             # S'assurer que le pointeur est au début
             if hasattr(file_obj, 'seek'):
                 file_obj.seek(0)
             
-            wrapped_file = FileWithLen(file_obj, size) if size is not None else file_obj
+            # Construire le multipart encoder pour le streaming
+            m = MultipartEncoder(
+                fields={
+                    "content": "iso",
+                    "filename": (filename, file_obj, "application/octet-stream")
+                }
+            )
             
-            files = {
-                "filename": (filename, wrapped_file)
-            }
+            headers["Content-Type"] = m.content_type
 
-            # On utilise requests.post directement
-            # En passant un objet qui a une méthode __len__, requests peut calculer le Content-Length
             response = await asyncio.to_thread(
                 requests.post,
                 url,
                 headers=headers,
-                data=data,
-                files=files,
+                data=m,
                 verify=self._settings.PROXMOX_VERIFY_SSL,
-                timeout=600  # 10 minutes
+                timeout=1800  # 30 minutes pour les gros fichiers
             )
 
             if response.status_code not in (200, 201):

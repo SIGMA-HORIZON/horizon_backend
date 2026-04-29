@@ -10,8 +10,8 @@ def check_vms():
     api = ProxmoxAPI(
         settings.PROXMOX_HOST,
         user=settings.PROXMOX_USER,
-        token_name=settings.PROXMOX_TOKEN_ID,
-        token_value=settings.PROXMOX_TOKEN_SECRET,
+        token_name=settings.PROXMOX_TOKEN_NAME,
+        token_value=settings.PROXMOX_TOKEN_VALUE,
         verify_ssl=settings.PROXMOX_VERIFY_SSL,
         timeout=10
     )

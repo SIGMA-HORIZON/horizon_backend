@@ -93,6 +93,16 @@ async def stop_vm(vm_id: uuid.UUID, current_user: CurrentUser, db: Session = Dep
     return schemas.VMStopMessageResponse(message="VM arrêtée.")
 
 
+@router.post(
+    "/{vm_id}/start",
+    summary="Démarrer une VM",
+)
+async def start_vm(vm_id: uuid.UUID, current_user: CurrentUser, db: Session = Depends(get_db)):
+    from horizon.shared.schemas.common import MessageResponse
+    await vm_service.start_vm(db, vm_id, current_user.id, current_user.role.value)
+    return MessageResponse(message="VM démarrée.")
+
+
 @router.delete("/{vm_id}", status_code=204, summary="Supprimer définitivement une VM")
 async def delete_vm(vm_id: uuid.UUID, current_user: CurrentUser, db: Session = Depends(get_db)):
     await vm_service.delete_vm(db, vm_id, current_user.id, current_user.role.value)
@@ -158,3 +168,9 @@ def get_ssh_key(vm_id: uuid.UUID, current_user: CurrentUser, db: Session = Depen
 )
 async def refresh_vm(vm_id: uuid.UUID, current_user: CurrentUser, db: Session = Depends(get_db)):
     return vm_service.refresh_vm_status(db, vm_id, current_user.id, current_user.role.value)
+
+
+@router.get("/cluster/status", summary="Résumé global du cluster pour le dashboard")
+async def get_cluster_status(current_user: CurrentUser):
+    from horizon.features.admin import service as admin_service
+    return await admin_service.get_proxmox_summary()

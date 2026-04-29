@@ -238,6 +238,34 @@ async def stop_vm(db: Session, vm_id, requesting_user_id, user_role: str, force:
     db.commit()
 
 
+async def start_vm(db: Session, vm_id, requesting_user_id, user_role: str) -> None:
+    from horizon.infrastructure.proxmox_client import ProxmoxClient, ProxmoxIntegrationError
+
+    vm = _get_vm_or_404(db, vm_id)
+    enforce_vm_ownership(vm.owner_id, requesting_user_id, user_role)
+
+    if vm.status == VMStatus.ACTIVE:
+        raise PolicyError("VM", "Cette VM est déjà en cours d'exécution.", 409)
+
+    s = get_settings()
+    if s.PROXMOX_ENABLED:
+        try:
+            client = ProxmoxClient()
+        except ProxmoxIntegrationError as e:
+            raise PolicyError("PROXMOX", e.message, e.status_code) from e
+        if client.enabled:
+            px_node = _resolve_proxmox_node_name(db, vm.node)
+            try:
+                await client.start_vm(px_node, vm.proxmox_vmid)
+            except ProxmoxIntegrationError as e:
+                raise PolicyError("PROXMOX", e.message, e.status_code) from e
+
+    vm.status = VMStatus.ACTIVE
+    vm.stopped_at = None
+    log_action(db, requesting_user_id, AuditAction.VM_STARTED, "vm", vm.id)
+    db.commit()
+
+
 async def delete_vm(db: Session, vm_id, requesting_user_id, user_role: str) -> None:
     from horizon.infrastructure.proxmox_client import ProxmoxClient, ProxmoxIntegrationError
 
