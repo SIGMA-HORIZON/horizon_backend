@@ -28,24 +28,61 @@ settings = get_settings()
 
 
 def submit_account_request(db: Session, data: dict) -> AccountRequest:
-    existing = db.query(AccountRequest).filter(AccountRequest.email == data["email"]).first()
-    if existing:
+    # 1. Vérifier si un compte existe déjà avec cet e-mail
+    existing_user = db.query(User).filter(User.email == data["email"]).first()
+    if existing_user:
         raise PolicyError(
             "POL-COMPTE-01",
-            "Une demande existe déjà pour cette adresse e-mail.",
+            "Un compte avec cet e-mail existe déjà.",
             409,
         )
 
-    req = AccountRequest(
-        id=uuid.uuid4(),
-        first_name=data["first_name"],
-        last_name=data["last_name"],
-        email=data["email"],
-        organisation=data["organisation"],
-        justification=data.get("justification"),
-        status=AccountRequestStatus.PENDING,
-    )
-    db.add(req)
+    # 2. Vérifier les demandes existantes
+    existing = db.query(AccountRequest).filter(AccountRequest.email == data["email"]).first()
+    if existing:
+        if existing.status == AccountRequestStatus.PENDING:
+            raise PolicyError(
+                "POL-COMPTE-01",
+                "Une demande en attente existe déjà pour cette adresse e-mail.",
+                409,
+            )
+        
+        if existing.status == AccountRequestStatus.APPROVED:
+            # Normalement déjà capturé par existing_user, mais sécurité supplémentaire
+            raise PolicyError(
+                "POL-COMPTE-01",
+                "Un compte a déjà été approuvé pour cette adresse e-mail.",
+                409,
+            )
+
+        # Si c'est REJECTED, on réutilise l'enregistrement (pour respecter la contrainte UNIQUE)
+        if existing.status == AccountRequestStatus.REJECTED:
+            existing.first_name = data["first_name"]
+            existing.last_name = data["last_name"]
+            existing.organisation = data["organisation"]
+            existing.justification = data.get("justification")
+            existing.status = AccountRequestStatus.PENDING
+            existing.reviewed_by_id = None
+            existing.reviewed_at = None
+            existing.rejection_reason = None
+            req = existing
+        else:
+            raise PolicyError(
+                "POL-COMPTE-01",
+                "Une demande existe déjà pour cette adresse e-mail.",
+                409,
+            )
+    else:
+        req = AccountRequest(
+            id=uuid.uuid4(),
+            first_name=data["first_name"],
+            last_name=data["last_name"],
+            email=data["email"],
+            organisation=data["organisation"],
+            justification=data.get("justification"),
+            status=AccountRequestStatus.PENDING,
+        )
+        db.add(req)
 
     log_action(db, None, AuditAction.ACCOUNT_REQUEST_SUBMITTED, "account_request", req.id)
     db.commit()
