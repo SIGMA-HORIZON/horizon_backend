@@ -272,6 +272,24 @@ async def create_vm_directly(db: Session, owner_id, body: schemas.ProxmoxCreateV
     if body.node:
         target_node = body.node
 
+    # 2. Network Isolation (VLAN)
+    vlan_id = _assign_vlan(db, owner_id)
+    net0 = _build_net0(vlan_id)
+    # If the user provided a custom net0 but it doesn't specify a tag, we could consider overriding or merging
+    # For now, we prioritize the isolated network string from _build_net0 if it's the default
+    if body.net0 != "virtio,bridge=vmbr0":
+        # Keep the user's base but ensure the tag is applied if isolation is active
+        # Simplified: if user provides custom net0, we assume they know what they're doing?
+        # No, for security/isolation we should probably enforce it.
+        # But a more robust way is to use _build_net0 logic.
+        pass
+    else:
+        # Use our built net0
+        pass
+    
+    # Final net0 decision: Use built one for consistency and isolation
+    final_net0 = net0
+
     # Resolve physical node for DB record
     mapping = db.query(ProxmoxNodeMapping).filter(
         ProxmoxNodeMapping.proxmox_node_name == target_node
@@ -297,7 +315,7 @@ async def create_vm_directly(db: Session, owner_id, body: schemas.ProxmoxCreateV
         status=VMStatus.PENDING,
         lease_start=now,
         lease_end=now + timedelta(hours=body.session_hours),
-        vlan_id=None,
+        vlan_id=vlan_id,
         ip_address=None,
         ssh_public_key=None, # Will be set below
         shared_space_gb=0.0,
@@ -349,7 +367,7 @@ async def create_vm_directly(db: Session, owner_id, body: schemas.ProxmoxCreateV
                 ram_mb=body.ram_mb,
                 storage_gb=body.storage_gb,
                 iso_storage=body.iso_storage,
-                net0=body.net0,
+                net0=final_net0,
                 ssh_key=public_key_to_inject,
             )
             await client.start_vm(node=target_node, vmid=body.vmid)
@@ -366,8 +384,10 @@ async def create_vm_directly(db: Session, owner_id, body: schemas.ProxmoxCreateV
                 "id": str(vm.id),
                 "proxmox_vmid": vm.proxmox_vmid,
                 "name": vm.name,
+                "vlan_id": vm.vlan_id,
             },
         }
+
     except PolicyError:
         db.rollback()
         raise
