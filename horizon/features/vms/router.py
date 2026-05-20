@@ -207,11 +207,27 @@ async def vnc_proxy_websocket(
 
         # 2. Resolve the Proxmox node name
         _settings = get_settings()
+        px_node = None
         try:
             px_node = _resolve_proxmox_node_name(db, vm.node)
-        except Exception as e:
-            logger.error(f"VNC: node resolution failed for VM {vm_id}: {e}")
-            px_node = _settings.PROXMOX_NODE or "pve1"
+        except Exception:
+            # Fallback to direct Proxmox lookup if mapping fails
+            from horizon.infrastructure.proxmox_client import ProxmoxClient
+            try:
+                client = ProxmoxClient()
+                if client.enabled:
+                    px_node = client._find_vm_node(vm.proxmox_vmid)
+                    if px_node:
+                        logger.info(f"VNC: Node for VM {vm_id} found dynamically on {px_node}")
+            except Exception as px_err:
+                logger.error(f"VNC: dynamic node lookup failed for VM {vm_id}: {px_err}")
+
+        if not px_node:
+            logger.error(f"VNC: node resolution failed for VM {vm_id}")
+            px_node = _settings.PROXMOX_NODE
+            if not px_node:
+                # If everything fails, we can't reliably guess pve1 anymore
+                raise HTTPException(status_code=500, detail="Impossible de localiser le nœud Proxmox de la VM.")
 
         logger.info(f"VNC proxy: vmid={vm.proxmox_vmid} node={px_node} port={port}")
 

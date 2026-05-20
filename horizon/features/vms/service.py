@@ -247,24 +247,43 @@ async def create_vm_directly(db: Session, owner_id, body: schemas.ProxmoxCreateV
     import uuid as _uuid
 
     _require_proxmox_enabled()
-
     s = get_settings()
     now = datetime.now(timezone.utc)
 
     # 1. Automate Node Selection (Scheduler)
-    target_node = s.PROXMOX_NODE or "pve1"  # Use setting or final fallback
+    target_node = s.PROXMOX_NODE # Use setting if provided
+    
     try:
         client = ProxmoxClient()
         if client.enabled:
-            nodes_info = client.get_nodes_resources(body.storage or s.PROXMOX_VM_STORAGE)
+            # We must use a valid storage name for checking resources.
+            # Default to the one in settings if not in request body.
+            storage_to_check = body.storage or s.PROXMOX_VM_STORAGE
+            nodes_info = client.get_nodes_resources(storage_to_check)
+            
             if nodes_info:
                 # Sort nodes by free storage (descending)
                 sorted_nodes = sorted(nodes_info, key=lambda x: x["storage_free"], reverse=True)
-                if sorted_nodes and sorted_nodes[0]["storage_free"] > 0:
+                # Ensure we pick a node that actually reports free space on that storage
+                if sorted_nodes and sorted_nodes[0].get("storage_free", 0) > 0:
                     target_node = sorted_nodes[0]["name"]
                     logger.info(f"Scheduler picked node {target_node} with {sorted_nodes[0]['storage_free']} bytes free.")
+                elif not target_node and sorted_nodes:
+                    # Fallback to the first online node if no storage info but we have nodes
+                    target_node = sorted_nodes[0]["name"]
+                    logger.warning(f"Scheduler found nodes but no storage free space info for {storage_to_check}. Using {target_node}.")
+            
+            if not target_node:
+                # If we still have no node and PROXMOX_NODE was empty, we can't proceed reliably
+                raise PolicyError("PROXMOX", f"Aucun nœud Proxmox disponible ou capable d'accueillir le stockage '{storage_to_check}'.", 503)
+
+    except PolicyError:
+        raise
     except Exception as e:
-        logger.warning(f"Scheduler failed, falling back to {target_node}: {e}")
+        if not target_node:
+            logger.error(f"Scheduler failed and no fallback node (PROXMOX_NODE): {e}")
+            raise PolicyError("PROXMOX", f"Erreur du scheduler Proxmox et aucun nœud par défaut configuré : {e}", 502)
+        logger.warning(f"Scheduler failed, falling back to configured node {target_node}: {e}")
 
     logger.info(f"Direct VM Creation - target_node: {target_node}, storage: {body.storage}, vmid: {body.vmid}")
 
