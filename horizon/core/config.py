@@ -60,7 +60,7 @@ class Settings(BaseSettings):
     DEFAULT_MAX_STORAGE_GB: float = 20.0
     DEFAULT_MAX_SHARED_SPACE_GB: float = 5.0
     DEFAULT_MAX_SIMULTANEOUS_VMS: int = 2
-    DEFAULT_MAX_SESSION_HOURS: int = 4
+    DEFAULT_MAX_SESSION_HOURS: int = 48
 
     HARD_LIMIT_VCPU: int = 8
     HARD_LIMIT_RAM_GB: float = 16.0
