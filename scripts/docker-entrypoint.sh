@@ -12,4 +12,8 @@ if [ "${HORIZON_AUTO_SEED:-true}" != "false" ]; then
   python scripts/seed.py
 fi
 
-exec uvicorn horizon.main:app --host 0.0.0.0 --port "$PORT" --workers 1
+if [ "$APP_ENV" = "development" ]; then
+  exec uvicorn horizon.main:app --host 0.0.0.0 --port "$PORT" --reload
+else
+  exec uvicorn horizon.main:app --host 0.0.0.0 --port "$PORT" --workers 1
+fi

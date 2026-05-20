@@ -39,7 +39,7 @@ def admin_list_vms(admin: AdminUser, db: Session = Depends(get_db)):
     response_model=schemas.AdminForceStopResponse,
     summary="[Admin] Arrêt forcé d'une VM",
 )
-def admin_force_stop(
+async def admin_force_stop(
     vm_id: uuid.UUID,
     body: schemas.ForceStopRequest,
     admin: AdminUser,
@@ -49,7 +49,7 @@ def admin_force_stop(
     owner = db.query(User).filter(User.id == vm.owner_id).first()
     vm_name = vm.name
 
-    vm_service.stop_vm(db, vm_id, admin.id, admin.role.value, force=True)
+    await vm_service.stop_vm(db, vm_id, admin.id, admin.role.value, force=True)
 
     if owner:
         send_vm_force_stopped(owner.email, vm_name,
@@ -59,8 +59,8 @@ def admin_force_stop(
 
 
 @router.delete("/vms/{vm_id}", status_code=204, summary="[Admin] Suppression administrative")
-def admin_delete_vm(vm_id: uuid.UUID, admin: AdminUser, db: Session = Depends(get_db)):
-    vm_service.delete_vm(db, vm_id, admin.id, admin.role.value)
+async def admin_delete_vm(vm_id: uuid.UUID, admin: AdminUser, db: Session = Depends(get_db)):
+    await vm_service.delete_vm(db, vm_id, admin.id, admin.role.value)
 
 
 @router.post(
@@ -280,6 +280,11 @@ def admin_list_proxmox_isos(admin: AdminUser, node: str = "pve", storage: str = 
     return client.list_isos_on_storage(node, storage)
 
 
+@router.post("/proxmox/sync-isos", summary="[Admin] Synchroniser les ISOs physiques avec la base de données")
+async def admin_sync_isos(admin: AdminUser, db: Session = Depends(get_db)):
+    return await admin_service.sync_isos_from_proxmox(db, admin.id)
+
+
 @router.post("/proxmox/upload-iso", summary="[Admin] Uploader un fichier ISO sur Proxmox")
 async def admin_upload_proxmox_iso(
     admin: AdminUser,
@@ -304,11 +309,10 @@ async def admin_create_proxmox_vm(
     current_user: CurrentUser,
     db: Session = Depends(get_db)
 ):
-    return await admin_service.create_vm_directly(db, current_user.id, body)
+    return await admin_service.create_vm_directly(db, body)
 
 
 @router.post("/proxmox/prepare-template", summary="[Admin] Préparer une VM à partir d'un ISO pour en faire un template")
-
 async def admin_prepare_template(
     body: schemas.PrepareTemplateRequest, admin: AdminUser, db: Session = Depends(get_db)
 ):

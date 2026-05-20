@@ -81,6 +81,8 @@ class Settings(BaseSettings):
     PROXMOX_NET0_TEMPLATE: str = "virtio,bridge=vmbr0"
     PROXMOX_VLAN_ISOLATION: bool = True
     PROXMOX_TIMEOUT: int = 120
+    PROXMOX_VM_STORAGE: str = "ceph-vm"
+    PROXMOX_ISO_STORAGE: str = "cephfs"
     # If true, Horizon will attempt to delete VMs from Proxmox and the DB immediately when they expire
     PROXMOX_DELETE_ON_EXPIRY: bool = True
     # root@pam credentials for VNC WebSocket session authentication (API tokens cannot auth vncwebsocket)

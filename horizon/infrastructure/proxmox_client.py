@@ -181,6 +181,7 @@ class ProxmoxClient:
         memory_mb: int,
         cores: int,
         net0: str,
+        storage: str | None = None,
         ssh_key: str | None = None,
     ) -> dict[str, Any]:
         try:
@@ -188,6 +189,8 @@ class ProxmoxClient:
             clone_params = {"newid": new_vmid, "name": name, "full": 1}
             if src_node != node:
                 clone_params["target"] = node
+            if storage:
+                clone_params["storage"] = storage
 
             src = self._nodes(src_node)
             raw_upid = src.qemu(template_vmid).clone.post(**clone_params)
@@ -257,7 +260,7 @@ class ProxmoxClient:
         
         try:
             n = self._nodes(node)
-            iso_path_storage = iso_storage or "nfs-shared-iso"
+            iso_path_storage = iso_storage or self._settings.PROXMOX_ISO_STORAGE
             
             params = {
                 "vmid": vmid,

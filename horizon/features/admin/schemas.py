@@ -245,7 +245,7 @@ class ProxmoxSummaryResponse(BaseModel):
 class PrepareTemplateRequest(BaseModel):
     vmid: int = Field(..., ge=100)
     node: str
-    storage: str = "local-lvm"
+    storage: str | None = Field(default=None, description="Stockage cible pour les disques")
     iso_storage: str | None = Field(default=None, description="Stockage où se trouve l'ISO (si différent du stockage disque)")
     iso_filename: str
     name: str = "template-prepare"
@@ -257,7 +257,7 @@ class PrepareTemplateRequest(BaseModel):
 class ProxmoxCreateVMRequest(BaseModel):
     vmid: int = Field(..., ge=100)
     node: str
-    storage: str = "local-lvm"
+    storage: str | None = Field(default=None, description="Stockage cible pour les disques")
     iso_storage: str | None = Field(default=None)
     iso_filename: str
     name: str

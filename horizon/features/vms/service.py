@@ -204,6 +204,7 @@ async def create_vm(db: Session, owner_id, data: dict) -> VirtualMachine:
                     memory_mb,
                     data["vcpu"],
                     net0,
+                    storage=s.PROXMOX_VM_STORAGE,
                     ssh_key=public_key,
                 )
                 # On capture l'IP s'il a été trouvé pendant la création
@@ -247,16 +248,15 @@ async def create_vm_directly(db: Session, owner_id, body: schemas.ProxmoxCreateV
 
     _require_proxmox_enabled()
 
-    
-
+    s = get_settings()
     now = datetime.now(timezone.utc)
 
     # 1. Automate Node Selection (Scheduler)
-    target_node = "pve1"  # Default fallback
+    target_node = s.PROXMOX_NODE or "pve1"  # Use setting or final fallback
     try:
         client = ProxmoxClient()
         if client.enabled:
-            nodes_info = client.get_nodes_resources(body.storage)
+            nodes_info = client.get_nodes_resources(body.storage or s.PROXMOX_VM_STORAGE)
             if nodes_info:
                 # Sort nodes by free storage (descending)
                 sorted_nodes = sorted(nodes_info, key=lambda x: x["storage_free"], reverse=True)
@@ -361,12 +361,12 @@ async def create_vm_directly(db: Session, owner_id, body: schemas.ProxmoxCreateV
                 node=target_node,
                 vmid=body.vmid,
                 name=body.name,
-                storage=body.storage or "local-lvm",
+                storage=body.storage or s.PROXMOX_VM_STORAGE,
                 iso_filename=body.iso_filename,
                 vcpu=body.vcpu,
                 ram_mb=body.ram_mb,
                 storage_gb=body.storage_gb,
-                iso_storage=body.iso_storage,
+                iso_storage=body.iso_storage or s.PROXMOX_ISO_STORAGE,
                 net0=final_net0,
                 ssh_key=public_key_to_inject,
             )

@@ -22,11 +22,14 @@ from horizon.shared.models import ISOImage, IsoProxmoxTemplate, ProxmoxNodeMappi
 # CONFIGURATION : Edit these values to match your Proxmox setup
 # --------------------------------------------------------------------------
 
-# Map PhysicalNode (REM, RAM, EMILIA) to your Proxmox node name (e.g., "pve1")
+load_dotenv()
+DEFAULT_PX_NODE = os.getenv("PROXMOX_NODE", "pve1")
+
+# Map PhysicalNode (REM, RAM, EMILIA) to your Proxmox node name
 NODE_MAPPINGS = {
-    PhysicalNode.REM: "pve1",
-    PhysicalNode.RAM: "pve1",      # You can map multiple to the same node
-    PhysicalNode.EMILIA: "pve1",
+    PhysicalNode.REM: DEFAULT_PX_NODE,
+    PhysicalNode.RAM: DEFAULT_PX_NODE,
+    PhysicalNode.EMILIA: DEFAULT_PX_NODE,
 }
 
 # Map ISO filename to Proxmox Template VMID

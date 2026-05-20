@@ -326,6 +326,70 @@ async def check_proxmox_health() -> schemas.ProxmoxHealthResponse:
         return schemas.ProxmoxHealthResponse(online=False, nodes_up=0, nodes_total=0)
 
 
+async def sync_isos_from_proxmox(db: Session, admin_id: uuid.UUID) -> dict[str, Any]:
+    """Synchronise la liste des ISOs physiques présents sur Proxmox avec la base de données."""
+    from horizon.infrastructure.proxmox_client import ProxmoxClient, ProxmoxIntegrationError
+    from horizon.shared.models.iso_image import OSFamily
+
+    _require_proxmox_enabled()
+    settings = get_settings()
+    node = settings.PROXMOX_NODE
+    storage = settings.PROXMOX_ISO_STORAGE
+
+    try:
+        client = ProxmoxClient()
+        physical_isos = client.list_isos_on_storage(node, storage)
+        
+        synced_count = 0
+        added_count = 0
+        
+        # Récupérer les ISOs existantes en base par leur filename
+        existing_isos = {iso.filename: iso for iso in db.query(ISOImage).all()}
+        
+        physical_filenames = set()
+        
+        for p_iso in physical_isos:
+            # p_iso["volid"] est typiquement "storage:iso/filename.iso"
+            filename = p_iso["volid"].split("/")[-1]
+            physical_filenames.add(filename)
+            
+            if filename in existing_isos:
+                # Si l'ISO est marquée inactive, on la réactive
+                if not existing_isos[filename].is_active:
+                    existing_isos[filename].is_active = True
+                    synced_count += 1
+            else:
+                # Ajout d'une nouvelle ISO découverte
+                new_iso = ISOImage(
+                    id=uuid.uuid4(),
+                    name=filename, # fallback sur le nom de fichier
+                    filename=filename,
+                    os_family=OSFamily.LINUX, # Par défaut
+                    os_version="Inconnue (détecté Proxmox)",
+                    description=f"Auto-importé depuis {node}/{storage}",
+                    added_by_id=admin_id,
+                    is_active=True
+                )
+                db.add(new_iso)
+                added_count += 1
+        
+        # Optionnel: On pourrait désactiver les ISOs qui ne sont plus physiques (soft delete)
+        for filename, iso in existing_isos.items():
+            if filename not in physical_filenames and iso.is_active:
+                iso.is_active = False
+                synced_count += 1
+                
+        db.commit()
+        return {
+            "status": "success",
+            "message": f"Synchronisation terminée. {added_count} ajoutés, {synced_count} mis à jour.",
+            "added": added_count,
+            "updated": synced_count
+        }
+    except ProxmoxIntegrationError as e:
+        raise PolicyError("PROXMOX", e.message, e.status_code) from e
+
+
 async def upload_iso_to_proxmox(
     db: Session,
     admin_id: uuid.UUID,
@@ -427,6 +491,7 @@ async def create_vm_directly(db: Session, body: schemas.ProxmoxCreateVMRequest) 
     import uuid as _uuid
 
     _require_proxmox_enabled()
+    s = get_settings()
 
     if not body.owner_id:
         raise PolicyError("VM", "owner_id is required to register VM in database.", 422)
@@ -487,12 +552,12 @@ async def create_vm_directly(db: Session, body: schemas.ProxmoxCreateVMRequest) 
                 node=body.node,
                 vmid=body.vmid,
                 name=body.name,
-                storage=body.storage,
+                storage=body.storage or s.PROXMOX_VM_STORAGE,
                 iso_filename=body.iso_filename,
                 vcpu=body.vcpu,
                 ram_mb=body.ram_mb,
                 storage_gb=body.storage_gb,
-                iso_storage=body.iso_storage,
+                iso_storage=body.iso_storage or s.PROXMOX_ISO_STORAGE,
                 net0=body.net0,
                 ssh_key=body.ssh_public_key,
             )

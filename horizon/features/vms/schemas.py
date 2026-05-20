@@ -37,7 +37,7 @@ class VMCreateRequest(BaseModel):
 class ProxmoxCreateVMRequest(BaseModel):
     vmid: int = Field(..., ge=100)
     node: str | None = None
-    storage: str = "local-lvm"
+    storage: str | None = Field(default=None, description="Stockage cible pour les disques")
     iso_storage: str | None = Field(default=None)
     iso_filename: str
     name: str

@@ -21,17 +21,17 @@ def test_conn():
             return
             
         print("Connected! Fetching version...")
-        version = client._api.version.get()
+        version = client.api.version.get()
         print(f"Proxmox Version: {version}")
         
         print("\nFetching nodes...")
-        nodes = client._api.nodes.get()
+        nodes = client.api.nodes.get()
         for node in nodes:
             node_name = node['node']
             print(f"- Node: {node_name} (Status: {node['status']}, CPU: {node.get('cpu', 0)*100:.1f}%)")
             
             # List VMs on this node
-            vms = client._api.nodes(node_name).qemu.get()
+            vms = client.api.nodes(node_name).qemu.get()
             print(f"  VMS found ({len(vms)}):")
             for vm in vms:
                 is_template = vm.get('template', 0) == 1
