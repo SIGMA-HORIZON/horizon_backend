@@ -199,7 +199,7 @@ class ProxmoxClient:
             if ssh_key:
                 parts = ssh_key.strip().split()
                 clean_key = f"{parts[0]} {parts[1]}" if len(parts) >= 2 else ssh_key.strip()
-                config_params["sshkeys"] = urllib.parse.quote(clean_key, safe="")
+                config_params["sshkeys"] = urllib.parse.quote(clean_key, safe="") # double encoding is REQUIRED here for Proxmox API
 
             # Use direct API call — proxmoxer decodes URL-encoded values before sending,
             # which breaks sshkeys. We bypass it here for this one call.
@@ -282,7 +282,7 @@ class ProxmoxClient:
             if ssh_key:
                 parts = ssh_key.strip().split()
                 clean_key = f"{parts[0]} {parts[1]}" if len(parts) >= 2 else ssh_key.strip()
-                config_params["sshkeys"] = urllib.parse.quote(clean_key, safe="")
+                config_params["sshkeys"] = urllib.parse.quote(clean_key, safe="") # double encoding is REQUIRED here for Proxmox API
 
             host = self._settings.PROXMOX_HOST
             port = self._settings.PROXMOX_PORT

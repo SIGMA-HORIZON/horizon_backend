@@ -79,6 +79,25 @@ def decode_access_token(token: str) -> dict:
         raise PolicyError("POL-SEC-02", f"Token invalide ou expiré : {e}", 401)
 
 
+def get_user_from_token(db: Session, token: str) -> User:
+    """
+    Récupère un utilisateur à partir d'un token JWT (utile pour les WebSockets).
+    """
+    payload = decode_access_token(token)
+    user_id = payload.get("sub")
+    if not user_id:
+        raise PolicyError("AUTH", "Token invalide : identifiant manquant.", 401)
+
+    user = db.query(User).filter(User.id == user_id).first()
+    if not user:
+        raise PolicyError("AUTH", "Utilisateur introuvable.", 401)
+
+    from horizon.shared.policies.enforcer import enforce_account_active
+    enforce_account_active(user.is_active)
+
+    return user
+
+
 def authenticate_user(db: Session, username: str, password: str, ip_address: str) -> User:
     GENERIC_ERROR = PolicyError(
         "POL-COMPTE-02",

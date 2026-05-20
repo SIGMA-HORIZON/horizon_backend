@@ -34,3 +34,4 @@ cryptography==42.0.5
 proxmoxer==2.0.1
 requests==2.32.3
 urllib3==2.2.1
+paramiko>=5.0.0

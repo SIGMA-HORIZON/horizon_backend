@@ -32,7 +32,7 @@ async def proxy_ssh(
                     # Fallback to RSA
                     pkey = paramiko.RSAKey.from_private_key(io.StringIO(private_key_str))
                 except Exception as key_err:
-                    logger.error(f"Failed to load SSH private key: {key_err}")
+                    logger.error(f"Failed to load SSH private key (length: {len(private_key_str) if private_key_str else 0}): {key_err}")
                     await websocket.close(code=1011, reason="Invalid SSH key format")
                     return
 
@@ -103,9 +103,23 @@ async def proxy_ssh(
         await asyncio.gather(forward_to_ssh(), forward_to_websocket())
 
     except Exception as e:
+        error_msg = str(e)
         logger.error(f"SSH Proxy error: {e}")
+        
+        # User-friendly mappings
+        if "timeout" in error_msg.lower():
+            friendly_reason = "Connection timed out. Is the VM still booting or is there a firewall?"
+        elif "authentication failed" in error_msg.lower() or "publickey" in error_msg.lower():
+            friendly_reason = "Authentication failed. Check your SSH keys or username."
+        elif "connection refused" in error_msg.lower():
+            friendly_reason = "Connection refused. Is the SSH service running on the VM?"
+        elif "no route to host" in error_msg.lower():
+            friendly_reason = "No route to host. The VM might be isolated or down."
+        else:
+            friendly_reason = f"SSH Error: {error_msg}"
+
         try:
-            await websocket.close(code=1011, reason=str(e))
+            await websocket.close(code=1011, reason=friendly_reason)
         except:
             pass
     finally:

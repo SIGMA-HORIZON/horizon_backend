@@ -76,6 +76,7 @@ class VMResponse(BaseModel):
     ram_usage: float | None = 0.0
     os_name: str | None = None
     os_family: str | None = None
+    is_template_based: bool = False
 
     @field_validator("status", mode="before")
     @classmethod

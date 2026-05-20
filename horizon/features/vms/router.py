@@ -141,6 +141,7 @@ def list_vms(current_user: CurrentUser, db: Session = Depends(get_db)):
         if r.iso_image:
             resp.os_name = r.iso_image.name
             resp.os_family = r.iso_image.os_family.value if hasattr(r.iso_image.os_family, 'value') else r.iso_image.os_family
+            resp.is_template_based = r.iso_image.proxmox_template_map is not None
         items.append(resp)
     return schemas.VMListResponse(items=items)
 
@@ -256,8 +257,14 @@ async def ssh_proxy_websocket(
         from horizon.features.auth.service import get_user_from_token
         try:
             current_user = get_user_from_token(db, token)
-        except Exception:
-            await websocket.close(code=1008, reason="Invalid token")
+            logger.info(f"SSH Auth: User {current_user.email} authenticated")
+        except PolicyError as e:
+            logger.error(f"SSH Auth Policy Error: {e.detail}")
+            await websocket.close(code=1008, reason=e.detail)
+            return
+        except Exception as auth_err:
+            logger.error(f"SSH Auth Unexpected Error: {auth_err}", exc_info=True)
+            await websocket.close(code=1008, reason="Erreur d'authentification interne")
             return
 
         # 2. Look up VM
@@ -272,7 +279,9 @@ async def ssh_proxy_websocket(
         try:
             enforce_vm_ownership(vm.owner_id, current_user.id, current_user.role.value)
             vm_service.enforce_vm_active_lease(vm)
+            logger.info(f"SSH Check: Ownership and lease verified for VM {vm_id}")
         except Exception as e:
+            logger.error(f"SSH Check Failed for VM {vm_id}: {e}")
             await websocket.close(code=1008, reason=str(e))
             return
 
@@ -292,12 +301,36 @@ async def ssh_proxy_websocket(
                 return
 
         # 4. Determine credentials
-        username = 'user' if vm.os_family != 'WINDOWS' else 'Administrator'
+        os_family = vm.iso_image.os_family if vm.iso_image else 'LINUX'
+        iso_name = vm.iso_image.name.lower() if vm.iso_image else ''
+        
+        if os_family == 'WINDOWS':
+            username = 'Administrator'
+        elif 'alpine' in iso_name:
+            username = 'alpine-user'
+        elif 'ubuntu' in iso_name:
+            username = 'ubuntu'
+        else:
+            username = 'user'
+            
         # If the VM has an os_name that implies a different user, we could refine this.
         
         # Check if we have a stored private key (for download)
         pkey = vm.ssh_public_key if vm.ssh_public_key and "-----BEGIN" in vm.ssh_public_key else None
         
+        if not vm.ip_address:
+            # Final attempt or detailed error
+            logger.warning(f"SSH Terminal: No IP address for VM {vm.id}")
+            error_detail = "La VM n'a pas encore d'adresse IP."
+            is_template = vm.iso_image and vm.iso_image.proxmox_template_map is not None
+            if is_template:
+                error_detail += " Assurez-vous que l'agent invité (QEMU Guest Agent) est installé et actif sur la VM."
+            else:
+                error_detail += " Si vous venez de l'installer depuis un ISO, configurez le réseau manuellement."
+            
+            await websocket.close(code=1011, reason=error_detail)
+            return
+
         logger.info(f"SSH Terminal: Connecting to {vm.ip_address} for user {current_user.email}")
         
         await proxy_ssh(
@@ -310,7 +343,8 @@ async def ssh_proxy_websocket(
     except Exception as e:
         logger.error(f"SSH WebSocket Error for {vm_id}: {e}", exc_info=True)
         try:
-            await websocket.close(code=1011)
+            # Send the error message as reason to help frontend diagnosis
+            await websocket.close(code=1011, reason=str(e))
         except Exception:
             pass
 
@@ -345,6 +379,7 @@ def get_vm(vm_id: uuid.UUID, current_user: CurrentUser, db: Session = Depends(ge
     if vm.iso_image:
         resp.os_name = vm.iso_image.name
         resp.os_family = vm.iso_image.os_family.value if hasattr(vm.iso_image.os_family, 'value') else vm.iso_image.os_family
+        resp.is_template_based = vm.iso_image.proxmox_template_map is not None
     
     return resp
 
