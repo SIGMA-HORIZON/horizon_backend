@@ -267,91 +267,9 @@ def seed():
         session.add_all(isos)
         session.flush()
 
-        # Correspondances ISO → template Proxmox (VMID d'exemple : à remplacer par vos vrais templates)
-        iso_templates = [
-            IsoProxmoxTemplate(
-                id=uuid.uuid4(),
-                iso_image_id=iso.id,
-                proxmox_template_vmid=9000 + idx,
-            )
-            for idx, iso in enumerate(isos)
-        ]
-        session.add_all(iso_templates)
-
-        # ---------------------------------------------------------- VIRTUAL MACHINES (15)
-        print("  -> Virtual machines (15)...")
-        nodes_cycle = [PhysicalNode.REM, PhysicalNode.RAM, PhysicalNode.EMILIA]
-        vm_configs = [
-            # (owner_idx, name, vcpu, ram, storage, iso_idx, status, lease_delta_hours, proxmox_vmid)
-            (0, "alice-ml-training",      4, 8.0,
-             50.0, 0, VMStatus.ACTIVE,    8,   101),
-            (0, "alice-dev-env",          2, 2.0,
-             20.0, 0, VMStatus.STOPPED,   0,   102),
-            (1, "boris-webserver",        2, 2.0,
-             20.0, 2, VMStatus.ACTIVE,    6,   103),
-            (2, "carole-data-analysis",   2, 4.0,
-             30.0, 1, VMStatus.ACTIVE,    4,   104),
-            (3, "david-cuda-lab",         8, 16.0,
-             80.0, 0, VMStatus.ACTIVE,    48,  105),
-            (3, "david-test-vm",          2, 2.0,
-             20.0, 2, VMStatus.STOPPED,   0,   106),
-            (4, "eve-django-dev",         2, 2.0,
-             20.0, 0, VMStatus.ACTIVE,    3,   107),
-            (5, "felix-docker-host",      4, 4.0,
-             40.0, 2, VMStatus.ACTIVE,    12,  108),
-            (6, "grace-simulation",       4, 8.0,
-             60.0, 4, VMStatus.ACTIVE,    24,  109),
-            (6, "grace-backup-vm",        2, 2.0,
-             20.0, 1, VMStatus.EXPIRED,   0,   110),
-            (7, "herve-security-lab",     2, 4.0,
-             25.0, 5, VMStatus.ACTIVE,    5,   111),
-            (8, "iris-win-dev",           4, 8.0,
-             60.0, 6, VMStatus.ACTIVE,    8,   112),
-            (9, "jules-research-cluster", 8, 16.0,
-             100.0, 0, VMStatus.ACTIVE,    72,  113),
-            (9, "jules-staging-env",      4, 4.0,
-             40.0, 1, VMStatus.SUSPENDED, 0,   114),
-            (2, "carole-win-test",        2, 4.0,
-             40.0, 7, VMStatus.STOPPED,   0,   115),
-        ]
-
-        vms = []
-        for i, (owner_idx, name, vcpu, ram, storage, iso_idx, status, lease_h, pvmid) in enumerate(vm_configs):
-            node = nodes_cycle[i % 3]
-            lease_start = now - timedelta(hours=2)
-            lease_end = now + \
-                timedelta(hours=lease_h) if lease_h > 0 else now - \
-                timedelta(hours=1)
-            vm = VirtualMachine(
-                id=uuid.uuid4(), proxmox_vmid=pvmid, name=name,
-                owner_id=all_users[owner_idx].id,
-                node=node, vcpu=vcpu, ram_gb=ram, storage_gb=storage,
-                iso_image_id=isos[iso_idx].id,
-                status=status, lease_start=lease_start, lease_end=lease_end,
-                vlan_id=100 + owner_idx,
-                ip_address=f"10.0.{owner_idx}.{i+10}",
-                ssh_public_key="ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAA... horizon-generated",
-                shared_space_gb=round(storage * 0.05, 1),
-                stopped_at=now -
-                timedelta(hours=3) if status != VMStatus.ACTIVE else None,
-            )
-            vms.append(vm)
-
-        session.add_all(vms)
-        session.flush()
-
         # ------------------------------------------------------------ RESERVATIONS
-        print("  -> Reservations...")
-        reservations = []
-        for vm in vms[:8]:
-            r = Reservation(
-                id=uuid.uuid4(), vm_id=vm.id, user_id=vm.owner_id,
-                start_time=vm.lease_start, end_time=vm.lease_end,
-                extended=False,
-            )
-            reservations.append(r)
-        session.add_all(reservations)
-        session.flush()
+        print("  -> Reservations (Disabled)...")
+        # Skipping placeholder reservations
 
         # --------------------------------------------------------------- AUDIT LOGS
         print("  -> Audit logs...")
