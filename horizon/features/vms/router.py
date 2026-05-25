@@ -156,21 +156,39 @@ async def get_vm_console(
     enforce_vm_ownership(vm.owner_id, current_user.id, current_user.role.value)
     vm_service.enforce_vm_active_lease(vm)
 
-    from horizon.infrastructure.proxmox_client import ProxmoxClient
-    client = ProxmoxClient()
-    if not client.enabled:
-        raise HTTPException(status_code=503, detail="Service Proxmox indisponible")
-
     px_node = _resolve_proxmox_node_name(db, vm.node)
+
+    from horizon.infrastructure.vnc_proxy import _proxmox_session_login, _get_vnc_ticket_with_session
+    _settings = get_settings()
+
     try:
-        vnc_data = await client.get_vnc_proxy(px_node, vm.proxmox_vmid)
-        # On ajoute des infos pour que le frontend sache où se connecter
-        vnc_data["host"] = settings.PROXMOX_HOST
-        vnc_data["node"] = px_node
-        vnc_data["vmid"] = vm.proxmox_vmid
-        return vnc_data
+        # We must get the ticket via password login (root@pam) so that the ticket user
+        # matches the PVEAuthCookie user used in the WebSocket proxy.
+        pve_cookie, csrf_token = _proxmox_session_login(
+            _settings.PROXMOX_HOST,
+            _settings.PROXMOX_ROOT_USER,
+            _settings.PROXMOX_ROOT_PASSWORD,
+            _settings.PROXMOX_VERIFY_SSL
+        )
+        ticket, port = _get_vnc_ticket_with_session(
+            _settings.PROXMOX_HOST,
+            px_node,
+            vm.proxmox_vmid,
+            pve_cookie,
+            csrf_token,
+            _settings.PROXMOX_VERIFY_SSL
+        )
+        
+        return {
+            "ticket": ticket,
+            "port": port,
+            "host": _settings.PROXMOX_HOST,
+            "node": px_node,
+            "vmid": vm.proxmox_vmid
+        }
     except Exception as e:
-        raise HTTPException(status_code=502, detail=str(e))
+        logger.error(f"Failed to get VNC ticket for VM {vm.proxmox_vmid}: {e}")
+        raise HTTPException(status_code=502, detail=f"Erreur lors de la création du proxy VNC : {str(e)}")
 
 
 @router.websocket("/vnc/{vm_id}")

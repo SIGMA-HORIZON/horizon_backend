@@ -111,49 +111,12 @@ async def proxy_vnc(
             pass
         return
 
-    # 2. Get a fresh VNC ticket from the same session
-    try:
-        vnc_ticket, vnc_port = _get_vnc_ticket_with_session(
-            proxmox_host, node, vmid, pve_cookie, csrf_token, verify_ssl
-        )
-        logger.info(f"VNC proxy: got VNC ticket port={vnc_port} for vmid={vmid}")
-    except Exception as e:
-        logger.error(f"VNC proxy: failed to get VNC ticket: {e}")
-        # Try to detect whether the VM exists on a different node (migrated or mapping stale).
-        try:
-            from horizon.infrastructure.proxmox_client import ProxmoxClient
-
-            client = ProxmoxClient()
-            if client.enabled:
-                found_node = client._find_vm_node(vmid)
-                if found_node and found_node != node:
-                    logger.info(f"VNC proxy: VM {vmid} found on different node {found_node}, retrying ticket request")
-                    try:
-                        vnc_ticket, vnc_port = _get_vnc_ticket_with_session(
-                            proxmox_host, found_node, vmid, pve_cookie, csrf_token, verify_ssl
-                        )
-                        node = found_node
-                        logger.info(f"VNC proxy: got VNC ticket port={vnc_port} for vmid={vmid} on node={node}")
-                    except Exception as e2:
-                        logger.error(f"VNC proxy: retry on discovered node failed: {e2}")
-                        try:
-                            await websocket.close(code=1011, reason="Could not get VNC ticket")
-                        except Exception:
-                            pass
-                        return
-        except Exception:
-            # If dynamic lookup fails, fall through to return the original error
-            pass
-        else:
-            # If dynamic lookup didn't yield a successful retry, close and return
-            if 'vnc_ticket' not in locals():
-                try:
-                    await websocket.close(code=1011, reason="Could not get VNC ticket")
-                except Exception:
-                    pass
-                return
-        
-        return
+    # 2. DO NOT fetch a fresh VNC ticket. We MUST use the one provided by the frontend
+    # because the frontend uses it as the VNC password.
+    # As long as the PVEAuthCookie and the ticket belong to the same user (e.g. root@pam),
+    # Proxmox will accept the connection.
+    vnc_ticket = ticket
+    vnc_port = port
 
     # 3. Build the Proxmox WS URL
     encoded_ticket = urllib.parse.quote(vnc_ticket, safe="")
