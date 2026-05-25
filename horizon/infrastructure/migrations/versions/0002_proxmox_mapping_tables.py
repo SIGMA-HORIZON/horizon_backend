@@ -68,7 +68,7 @@ def upgrade() -> None:
     )
 
     conn = op.get_bind()
-    for pn, name in [("REM", "pve-rem"), ("RAM", "pve-ram"), ("EMILIA", "pve-emilia")]:
+    for pn, name in [("REM", "rem"), ("RAM", "ram"), ("EMILIA", "emilia")]:
         conn.execute(
             sa.text(
                 "INSERT INTO proxmox_node_mappings (id, physical_node, proxmox_node_name) "
