@@ -282,14 +282,8 @@ def seed():
              "user", all_users[2].id, "192.168.1.2"),
             (admin2.id, AuditAction.QUOTA_OVERRIDE_GRANTED,
              "user", all_users[0].id, "192.168.1.2"),
-            (all_users[0].id, AuditAction.VM_CREATED,
-             "vm", vms[0].id, "10.0.0.10"),
             (all_users[0].id, AuditAction.LOGIN_SUCCESS,
              "user", all_users[0].id, "10.0.0.10"),
-            (all_users[3].id, AuditAction.VM_CREATED,
-             "vm", vms[4].id, "10.0.3.10"),
-            (admin1.id, AuditAction.VM_FORCE_STOPPED,
-             "vm", vms[13].id, "192.168.1.1"),
             (admin2.id, AuditAction.ACCOUNT_SUSPENDED,
              "user", inactive_user.id, "192.168.1.2"),
             (all_users[5].id, AuditAction.LOGIN_FAILURE,
@@ -298,10 +292,6 @@ def seed():
              "user", all_users[5].id, "10.0.5.1"),
             (admin1.id, AuditAction.ISO_IMAGE_ADDED,
              "iso_image", isos[5].id, "192.168.1.1"),
-            (all_users[8].id, AuditAction.VM_CREATED,
-             "vm", vms[11].id, "10.0.8.10"),
-            (all_users[9].id, AuditAction.VM_LEASE_EXTENDED,
-             "vm", vms[12].id, "10.0.9.10"),
             (admin3.id, AuditAction.PASSWORD_RESET,
              "user", all_users[4].id, "192.168.1.3"),
         ]
@@ -326,7 +316,7 @@ def seed():
         # ------------------------------------------------------- SECURITY INCIDENTS (3)
         print("  -> Security incidents...")
         inc1 = SecurityIncident(
-            id=uuid.uuid4(), vm_id=vms[13].id, user_id=all_users[9].id,
+            id=uuid.uuid4(), vm_id=None, user_id=all_users[9].id,
             incident_type=IncidentType.NETWORK_SCAN_DETECTED,
             severity=IncidentSeverity.HIGH, status=IncidentStatus.RESOLVED,
             description="Scan de port détecté depuis la VM jules-staging-env vers d'autres VMs du cluster.",
@@ -335,7 +325,7 @@ def seed():
             resolved_by_id=admin1.id,
         )
         inc2 = SecurityIncident(
-            id=uuid.uuid4(), vm_id=vms[10].id, user_id=all_users[7].id,
+            id=uuid.uuid4(), vm_id=None, user_id=all_users[7].id,
             incident_type=IncidentType.EXPLOIT_TOOL_DETECTED,
             severity=IncidentSeverity.MEDIUM, status=IncidentStatus.INVESTIGATING,
             description="Outil de fuzzing détecté en exécution sur herve-security-lab - usage pédagogique non déclaré.",
@@ -355,21 +345,21 @@ def seed():
         # ------------------------------------------------------- QUOTA VIOLATIONS (4)
         print("  -> Quota violations...")
         viol1 = QuotaViolation(
-            id=uuid.uuid4(), vm_id=vms[4].id, user_id=all_users[3].id,
+            id=uuid.uuid4(), vm_id=None, user_id=all_users[3].id,
             violation_type=ViolationType.SESSION_TIME,
             sanction_level=SanctionLevel.LEVEL_1,
             observed_value=50.0, limit_value=48.0, resolved=True,
             created_at=now - timedelta(hours=72),
         )
         viol2 = QuotaViolation(
-            id=uuid.uuid4(), vm_id=vms[0].id, user_id=all_users[0].id,
+            id=uuid.uuid4(), vm_id=None, user_id=all_users[0].id,
             violation_type=ViolationType.RAM,
             sanction_level=SanctionLevel.LEVEL_1,
             observed_value=9.2, limit_value=8.0, resolved=True,
             created_at=now - timedelta(hours=24),
         )
         viol3 = QuotaViolation(
-            id=uuid.uuid4(), vm_id=vms[8].id, user_id=all_users[6].id,
+            id=uuid.uuid4(), vm_id=None, user_id=all_users[6].id,
             violation_type=ViolationType.CPU,
             sanction_level=SanctionLevel.LEVEL_2,
             observed_value=6.0, limit_value=4.0, resolved=False,
@@ -419,8 +409,8 @@ def seed():
         print(f"  Admins        : 3")
         print(f"  Users         : {len(all_users)}")
         print(f"  ISO images    : {len(isos)}")
-        print(f"  VMs           : {len(vms)}")
-        print(f"  Reservations  : {len(reservations)}")
+        print(f"  VMs           : 0")
+        print(f"  Reservations  : 0")
         print(f"  Audit logs    : {len(audit_entries)}")
         print(f"  Incidents     : 3")
         print(f"  Violations    : 4")

@@ -50,8 +50,11 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
+# --- Middleware (LIFO: le dernier ajouté = le plus externe) ---
+# 1. D'abord HTTPS enforcement (couche interne)
 app.add_middleware(HTTPSEnforcementMiddleware)
-
+# 2. Ensuite CORS (couche externe) — garantit que les headers CORS
+#    sont TOUJOURS présents, même sur les réponses 500.
 app.add_middleware(
     CORSMiddleware,
     # Allow local dev origins (any localhost port) plus known production host
@@ -75,8 +78,7 @@ from horizon.shared.policies.enforcer import PolicyError
 
 @app.exception_handler(PolicyError)
 async def policy_exception_handler(request: Request, exc: PolicyError):
-    with open('/tmp/horizon_debug.log', 'a') as f:
-        f.write(f"PolicyError: {exc.detail}\n")
+    logger.warning("PolicyError: %s", exc.detail)
     return JSONResponse(
         status_code=exc.status_code,
         content={"detail": exc.detail},
@@ -94,8 +96,7 @@ async def validation_exception_handler(request: Request, exc: RequestValidationE
                 if isinstance(v, Exception):
                     error["ctx"][k] = str(v)
     
-    with open('/tmp/horizon_debug.log', 'a') as f:
-        f.write(f"ValidationError: {errors}\n")
+    logger.warning("ValidationError: %s", errors)
     return JSONResponse(
         status_code=422,
         content={"detail": errors}
@@ -104,9 +105,6 @@ async def validation_exception_handler(request: Request, exc: RequestValidationE
 @app.exception_handler(Exception)
 async def global_exception_handler(request: Request, exc: Exception):
     logger.error("Erreur non gérée : %s", exc, exc_info=True)
-    import traceback
-    with open('/tmp/horizon_debug.log', 'a') as f:
-        f.write(f"Exception: {traceback.format_exc()}\n")
     return JSONResponse(
         status_code=500,
         content={"detail": "Erreur interne du serveur. Contactez l'équipe SIGMA."},
