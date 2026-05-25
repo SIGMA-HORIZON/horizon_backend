@@ -373,18 +373,16 @@ async def sync_isos_from_proxmox(db: Session, admin_id: uuid.UUID) -> dict[str, 
                 db.add(new_iso)
                 added_count += 1
         
-        # Marquer comme inactives les ISOs qui ne sont plus physiques
-        for filename, iso in existing_isos.items():
-            if filename not in physical_filenames and iso.is_active:
-                iso.is_active = False
-                synced_count += 1
-
-        # Supprimer définitivement toutes les ISOs marquées inactives
-        # (cela supprimera aussi les mappings templates via ON DELETE CASCADE)
-        inactive_deleted = db.query(ISOImage).filter(ISOImage.is_active == False).delete(synchronize_session=False)
-        if inactive_deleted:
-            # Count deletions as part of updates for reporting
-            synced_count += inactive_deleted
+        # Supprimer définitivement les ISOs qui ne sont plus présentes physiquement
+        to_delete_filenames = [
+            filename for filename, iso in existing_isos.items()
+            if filename not in physical_filenames
+        ]
+        
+        deleted_count = 0
+        if to_delete_filenames:
+            deleted_count = db.query(ISOImage).filter(ISOImage.filename.in_(to_delete_filenames)).delete(synchronize_session='fetch')
+            synced_count += deleted_count
 
         db.commit()
         return {

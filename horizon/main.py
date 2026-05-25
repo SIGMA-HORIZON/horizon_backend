@@ -18,6 +18,8 @@ from horizon.features.auth.router import router as auth_router
 from horizon.features.vms.router import router as vms_router
 from horizon.infrastructure.scheduler import start_scheduler, stop_scheduler
 from horizon.shared.middleware.security import HTTPSEnforcementMiddleware
+from horizon.shared.models import PhysicalNode, ProxmoxNodeMapping, User, UserRoleEnum
+from horizon.infrastructure.database import SessionLocal
 
 settings = get_settings()
 
@@ -31,7 +33,53 @@ logger = logging.getLogger("horizon.main")
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     logger.info("Horizon API - Démarrage...")
+    
+    # 1. Start scheduler
     start_scheduler()
+    
+    # 2. Infrastructure Initialization
+    if settings.PROXMOX_ENABLED:
+        try:
+            from horizon.features.admin.service import sync_isos_from_proxmox
+            
+            db = SessionLocal()
+            try:
+                # 2.1 Fix Node Mappings (rem, ram, emilia)
+                # Correct stale mappings like 'pve-rem' that cause hostname lookup failures
+                node_mappings = {
+                    PhysicalNode.REM: "rem",
+                    PhysicalNode.RAM: "ram",
+                    PhysicalNode.EMILIA: "emilia",
+                }
+                logger.info("Validation des mappings de nœuds Proxmox...")
+                for p_node, px_name in node_mappings.items():
+                    mapping = db.query(ProxmoxNodeMapping).filter_by(physical_node=p_node).first()
+                    if mapping:
+                        if mapping.proxmox_node_name != px_name:
+                            logger.info(f"Correction du mapping {p_node}: {mapping.proxmox_node_name} -> {px_name}")
+                            mapping.proxmox_node_name = px_name
+                    else:
+                        logger.info(f"Création du mapping {p_node} -> {px_name}")
+                        db.add(ProxmoxNodeMapping(physical_node=p_node, proxmox_node_name=px_name))
+                
+                db.commit()
+
+                # 2.2 ISO Auto-Sync
+                # Fetch first super_admin to attribute the sync action
+                admin = db.query(User).filter(User.role == UserRoleEnum.SUPER_ADMIN).first()
+                if admin:
+                    logger.info("Synchronisation automatique des ISOs Proxmox...")
+                    result = await sync_isos_from_proxmox(db, admin.id)
+                    logger.info(f"Résultat sync ISO: {result['message']}")
+                else:
+                    logger.warning("Aucun super_admin trouvé pour la synchronisation des ISOs.")
+            
+            finally:
+                db.close()
+                
+        except Exception as e:
+            logger.error(f"Échec de l'initialisation infrastructure au démarrage: {e}", exc_info=True)
+
     yield
     logger.info("Horizon API - Arrêt...")
     stop_scheduler()
