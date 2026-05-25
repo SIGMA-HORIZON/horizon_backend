@@ -62,7 +62,7 @@ Endpoints d’exploration / pause : préfixe admin existant, sous-chemins `.../p
 
 ## Tests
 
-Créer un environnement virtuel, installer les dépendances, lancer la suite (Docker requis pour Postgres Testcontainers). `pytest.ini` définit déjà `pythonpath = .` :
+Créer un environnement virtuel , installer les dépendances, lancer la suite (Docker requis pour Postgres Testcontainers). `pytest.ini` définit déjà `pythonpath = .` :
 
 ```bash
 python3 -m venv .venv
