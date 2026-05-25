@@ -181,8 +181,8 @@ class ProxmoxClient:
         memory_mb: int,
         cores: int,
         net0: str,
-        storage: str | None = None,
         ssh_key: str | None = None,
+        storage: str | None = None,
     ) -> dict[str, Any]:
         try:
             src_node = self._find_vm_node(template_vmid) or node

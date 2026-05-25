@@ -206,6 +206,7 @@ async def create_vm(db: Session, owner_id, data: dict) -> VirtualMachine:
                     net0,
                     storage=s.PROXMOX_VM_STORAGE,
                     ssh_key=public_key,
+                    storage=data.get("storage", "stockage.ceph"),
                 )
                 # On capture l'IP s'il a été trouvé pendant la création
                 if res.get("ip_address"):
@@ -256,29 +257,26 @@ async def create_vm_directly(db: Session, owner_id, body: schemas.ProxmoxCreateV
     try:
         client = ProxmoxClient()
         if client.enabled:
-            # We must use a valid storage name for checking resources.
-            # Default to the one in settings if not in request body.
             storage_to_check = body.storage or s.PROXMOX_VM_STORAGE
             nodes_info = client.get_nodes_resources(storage_to_check)
             
             if nodes_info:
-                # Sort nodes by free storage (descending)
-                sorted_nodes = sorted(nodes_info, key=lambda x: x["storage_free"], reverse=True)
-                # Ensure we pick a node that actually reports free space on that storage
-                if sorted_nodes and sorted_nodes[0].get("storage_free", 0) > 0:
-                    target_node = sorted_nodes[0]["name"]
-                    logger.info(f"Scheduler picked node {target_node} with {sorted_nodes[0]['storage_free']} bytes free.")
-                elif not target_node and sorted_nodes:
-                    # Fallback to the first online node if no storage info but we have nodes
-                    target_node = sorted_nodes[0]["name"]
-                    logger.warning(f"Scheduler found nodes but no storage free space info for {storage_to_check}. Using {target_node}.")
+                allowed_nodes = {"rem", "ram", "emilia"}
+                filtered_nodes = [n for n in nodes_info if n["name"].lower() in allowed_nodes]
+                if filtered_nodes:
+                    # Sort nodes by free RAM and Storage (descending)
+                    sorted_nodes = sorted(filtered_nodes, key=lambda x: (x.get("storage_free", 0), x.get("ram_free", 0)), reverse=True)
+                    if sorted_nodes and sorted_nodes[0].get("storage_free", 0) > 0:
+                        target_node = sorted_nodes[0]["name"]
+                        logger.info(f"Scheduler picked node {target_node} with {sorted_nodes[0]['storage_free']} bytes free.")
+                elif not target_node and (nodes_info):
+                    # Fallback if allowed_nodes are not reported but we have others, stick to target_node or first online
+                    target_node = nodes_info[0]["name"]
+                    logger.warning(f"Scheduler found nodes but none matching allowed list. Using fallback {target_node}.")
             
             if not target_node:
-                # If we still have no node and PROXMOX_NODE was empty, we can't proceed reliably
                 raise PolicyError("PROXMOX", f"Aucun nœud Proxmox disponible ou capable d'accueillir le stockage '{storage_to_check}'.", 503)
 
-    except PolicyError:
-        raise
     except Exception as e:
         if not target_node:
             logger.error(f"Scheduler failed and no fallback node (PROXMOX_NODE): {e}")
@@ -671,8 +669,31 @@ def _get_vm_or_404(db: Session, vm_id) -> VirtualMachine:
     return vm
 
 
-def _select_node(db: Session) -> PhysicalNode:
+def _select_node(db: Session, storage: str = "stockage.ceph") -> PhysicalNode:
     nodes = [PhysicalNode.REM, PhysicalNode.RAM, PhysicalNode.EMILIA]
+    s = get_settings()
+
+    if s.PROXMOX_ENABLED:
+        try:
+            from horizon.infrastructure.proxmox_client import ProxmoxClient
+            client = ProxmoxClient()
+            if client.enabled:
+                nodes_info = client.get_nodes_resources(storage)
+                if nodes_info:
+                    allowed_names = {n.value.lower() for n in nodes}
+                    filtered = [n for n in nodes_info if n["name"].lower() in allowed_names]
+                    if filtered:
+                        # Sort by storage_free and ram_free (descending)
+                        sorted_nodes = sorted(filtered, key=lambda x: (x["storage_free"], x["ram_free"]), reverse=True)
+                        best_name = sorted_nodes[0]["name"].lower()
+                        for n in nodes:
+                            if n.value.lower() == best_name:
+                                logger.info(f"Scheduler picked optimal node {n.value} based on resources.")
+                                return n
+        except Exception as e:
+            logger.warning(f"Resource-aware scheduling failed, falling back to VM counts: {e}")
+
+    # Fallback to basic counts
     counts = {}
     for n in nodes:
         counts[n] = (
