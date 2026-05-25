@@ -59,8 +59,8 @@ app.add_middleware(
     CORSMiddleware,
     # Allow local dev origins (any localhost port) plus known production host
     allow_origins=["https://horizon.enspy.cm", "http://192.168.123.100:3010"],
-    # Accept localhost and 127.0.0.1 on any port (http). Covers common dev host variants.
-    allow_origin_regex=r"^http://(localhost|127\.0\.0\.1)(:[0-9]+)?$",
+    # Accept any http/https origin for easy deployment
+    allow_origin_regex=r"^https?://.*$",
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
