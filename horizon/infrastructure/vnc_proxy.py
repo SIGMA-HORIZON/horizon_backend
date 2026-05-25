@@ -119,10 +119,40 @@ async def proxy_vnc(
         logger.info(f"VNC proxy: got VNC ticket port={vnc_port} for vmid={vmid}")
     except Exception as e:
         logger.error(f"VNC proxy: failed to get VNC ticket: {e}")
+        # Try to detect whether the VM exists on a different node (migrated or mapping stale).
         try:
-            await websocket.close(code=1011, reason="Could not get VNC ticket")
+            from horizon.infrastructure.proxmox_client import ProxmoxClient
+
+            client = ProxmoxClient()
+            if client.enabled:
+                found_node = client._find_vm_node(vmid)
+                if found_node and found_node != node:
+                    logger.info(f"VNC proxy: VM {vmid} found on different node {found_node}, retrying ticket request")
+                    try:
+                        vnc_ticket, vnc_port = _get_vnc_ticket_with_session(
+                            proxmox_host, found_node, vmid, pve_cookie, csrf_token, verify_ssl
+                        )
+                        node = found_node
+                        logger.info(f"VNC proxy: got VNC ticket port={vnc_port} for vmid={vmid} on node={node}")
+                    except Exception as e2:
+                        logger.error(f"VNC proxy: retry on discovered node failed: {e2}")
+                        try:
+                            await websocket.close(code=1011, reason="Could not get VNC ticket")
+                        except Exception:
+                            pass
+                        return
         except Exception:
+            # If dynamic lookup fails, fall through to return the original error
             pass
+        else:
+            # If dynamic lookup didn't yield a successful retry, close and return
+            if 'vnc_ticket' not in locals():
+                try:
+                    await websocket.close(code=1011, reason="Could not get VNC ticket")
+                except Exception:
+                    pass
+                return
+        
         return
 
     # 3. Build the Proxmox WS URL

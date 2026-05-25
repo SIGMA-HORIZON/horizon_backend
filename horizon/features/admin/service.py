@@ -271,7 +271,7 @@ def patch_iso_proxmox_template(
 
 
 def list_iso_images(db: Session) -> schemas.ISOImageListResponse:
-    rows = db.query(ISOImage).order_by(ISOImage.created_at.desc()).all()
+    rows = db.query(ISOImage).filter(ISOImage.is_active == True).order_by(ISOImage.created_at.desc()).all()
     return schemas.ISOImageListResponse(
         items=[schemas.ISOImageResponse.model_validate(r) for r in rows]
     )
@@ -373,12 +373,19 @@ async def sync_isos_from_proxmox(db: Session, admin_id: uuid.UUID) -> dict[str, 
                 db.add(new_iso)
                 added_count += 1
         
-        # Optionnel: On pourrait désactiver les ISOs qui ne sont plus physiques (soft delete)
+        # Marquer comme inactives les ISOs qui ne sont plus physiques
         for filename, iso in existing_isos.items():
             if filename not in physical_filenames and iso.is_active:
                 iso.is_active = False
                 synced_count += 1
-                
+
+        # Supprimer définitivement toutes les ISOs marquées inactives
+        # (cela supprimera aussi les mappings templates via ON DELETE CASCADE)
+        inactive_deleted = db.query(ISOImage).filter(ISOImage.is_active == False).delete(synchronize_session=False)
+        if inactive_deleted:
+            # Count deletions as part of updates for reporting
+            synced_count += inactive_deleted
+
         db.commit()
         return {
             "status": "success",
@@ -410,9 +417,14 @@ async def upload_iso_to_proxmox(
     _require_proxmox_enabled()
     os_family = os_family.upper()
     try:
+        # Use configured defaults if node/storage not provided
+        settings = get_settings()
+        node_val = node or settings.PROXMOX_NODE
+        storage_val = storage or settings.PROXMOX_ISO_STORAGE
+
         client = ProxmoxClient()
         # 1. Upload physique vers Proxmox
-        res = await client.upload_iso(node, storage, file_obj, filename)
+        res = await client.upload_iso(node_val, storage_val, file_obj, filename)
 
         # 2. Enregistrement automatique dans la table iso_images
         new_iso = ISOImage(

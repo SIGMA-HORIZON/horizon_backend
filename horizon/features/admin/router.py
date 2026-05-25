@@ -6,6 +6,7 @@ from fastapi import APIRouter, Depends, Query, UploadFile, File
 from sqlalchemy.orm import Session
 
 from horizon.shared.dependencies import CurrentUser
+from horizon.core.config import get_settings
 from horizon.features.admin import schemas
 from horizon.features.admin import service as admin_service
 from horizon.features.vms import service as vm_service
@@ -288,8 +289,8 @@ async def admin_sync_isos(admin: AdminUser, db: Session = Depends(get_db)):
 @router.post("/proxmox/upload-iso", summary="[Admin] Uploader un fichier ISO sur Proxmox")
 async def admin_upload_proxmox_iso(
     admin: AdminUser,
-    node: str = Query("pve"),
-    storage: str = Query("local"),
+    node: str | None = Query(None),
+    storage: str | None = Query(None),
     name: str | None = Query(None),
     os_family: str = Query("LINUX"),
     os_version: str = Query("Unknown"),
@@ -297,8 +298,11 @@ async def admin_upload_proxmox_iso(
     file: UploadFile = File(...),
     db: Session = Depends(get_db),
 ):
+    settings = get_settings()
+    node_val = node or settings.PROXMOX_NODE
+    storage_val = storage or settings.PROXMOX_ISO_STORAGE
     return await admin_service.upload_iso_to_proxmox(
-        db, admin.id, node, storage, file.file, file.filename,
+        db, admin.id, node_val, storage_val, file.file, file.filename,
         name, os_family, os_version, description
     )
 
