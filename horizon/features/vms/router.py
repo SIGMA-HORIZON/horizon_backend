@@ -156,7 +156,22 @@ async def get_vm_console(
     enforce_vm_ownership(vm.owner_id, current_user.id, current_user.role.value)
     vm_service.enforce_vm_active_lease(vm)
 
-    px_node = _resolve_proxmox_node_name(db, vm.node)
+    try:
+        px_node = _resolve_proxmox_node_name(db, vm.node)
+    except Exception:
+        px_node = None
+        
+    if not px_node:
+        from horizon.infrastructure.proxmox_client import ProxmoxClient
+        try:
+            client = ProxmoxClient()
+            if client.enabled:
+                px_node = client._find_vm_node(vm.proxmox_vmid)
+        except Exception:
+            pass
+            
+    if not px_node:
+        px_node = get_settings().PROXMOX_NODE
 
     from horizon.infrastructure.vnc_proxy import _proxmox_session_login, _get_vnc_ticket_with_session
     _settings = get_settings()
@@ -188,7 +203,10 @@ async def get_vm_console(
         }
     except Exception as e:
         logger.error(f"Failed to get VNC ticket for VM {vm.proxmox_vmid}: {e}")
-        raise HTTPException(status_code=502, detail=f"Erreur lors de la création du proxy VNC : {str(e)}")
+        error_msg = str(e)
+        if "HTTP Error 500" in error_msg and "does not exist" in error_msg:
+            error_msg = f"La VM {vm.proxmox_vmid} est introuvable sur le serveur Proxmox (nœud: {px_node}). Elle a peut-être été supprimée ou migrée manuellement."
+        raise HTTPException(status_code=502, detail=f"Erreur lors de la création du proxy VNC : {error_msg}")
 
 
 @router.websocket("/vnc/{vm_id}")
