@@ -206,6 +206,7 @@ async def create_vm(db: Session, owner_id, data: dict) -> VirtualMachine:
                     net0,
                     storage=s.PROXMOX_VM_STORAGE,
                     ssh_key=public_key,
+                    storage=data.get("storage", "stockage.ceph"),
                 )
                 # On capture l'IP s'il a été trouvé pendant la création
                 if res.get("ip_address"):
