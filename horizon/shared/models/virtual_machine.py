@@ -98,3 +98,21 @@ class Reservation(Base, TimestampMixin):
     parent = relationship(
         "Reservation", remote_side="Reservation.id", foreign_keys=[extension_of]
     )
+
+
+class ExtensionRequest(Base, TimestampMixin):
+    __tablename__ = "extension_requests"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    vm_id = Column(
+        UUID(as_uuid=True), ForeignKey("virtual_machines.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    user_id = Column(
+        UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False
+    )
+    status = Column(String(20), nullable=False, default="PENDING")
+    reason = Column(Text, nullable=True)
+    admin_comment = Column(Text, nullable=True)
+
+    vm = relationship("VirtualMachine")
+    user = relationship("User")

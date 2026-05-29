@@ -99,3 +99,21 @@ class VMStopMessageResponse(BaseModel):
 class SSHKeyDownloadResponse(BaseModel):
     ssh_public_key: str
     warning: str
+
+
+class ExtensionRequestCreate(BaseModel):
+    reason: str | None = None
+
+
+class ExtensionRequestResponse(BaseModel):
+    model_config = {"from_attributes": True}
+
+    id: UUID
+    vm_id: UUID
+    user_id: UUID
+    status: str
+    reason: str | None
+    admin_comment: str | None
+    created_at: datetime
+    vm_name: str | None = None
+    username: str | None = None

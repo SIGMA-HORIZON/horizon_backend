@@ -29,6 +29,10 @@ class ForceStopRequest(BaseModel):
     reason: str | None = Field(default="Arrêt forcé par administrateur")
 
 
+class AdminDeleteVMRequest(BaseModel):
+    reason: str = Field(..., min_length=5, description="Raison de la suppression")
+
+
 class QuotaOverrideRequest(BaseModel):
     user_id: str
     max_vcpu_per_vm: int | None = None

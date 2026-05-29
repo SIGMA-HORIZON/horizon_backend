@@ -32,6 +32,7 @@ class Settings(BaseSettings):
     SMTP_TLS: bool = True
     EMAIL_FROM: str = "no-reply@horizon.enspy.cm"
     EMAIL_FROM_NAME: str = "Horizon ENSPY"
+    ADMIN_EMAIL: str = "admin@horizon.enspy.cm"
 
     BCRYPT_ROUNDS: int = 12
     ENFORCE_HTTPS: bool = False
