@@ -541,3 +541,17 @@ def get_ssh_key(vm_id: uuid.UUID, current_user: CurrentUser, db: Session = Depen
 )
 async def refresh_vm(vm_id: uuid.UUID, current_user: CurrentUser, db: Session = Depends(get_db)):
     return vm_service.refresh_vm_status(db, vm_id, current_user.id, current_user.role.value)
+
+
+@router.post(
+    "/{vm_id}/request-extension",
+    response_model=schemas.ExtensionRequestResponse,
+    summary="Demander une prolongation de lease",
+)
+def request_extension(
+    vm_id: uuid.UUID,
+    body: schemas.ExtensionRequestCreate,
+    current_user: CurrentUser,
+    db: Session = Depends(get_db),
+):
+    return vm_service.request_vm_extension(db, vm_id, current_user.id, body.reason)

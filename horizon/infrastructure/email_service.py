@@ -193,6 +193,55 @@ def send_vm_force_stopped(to: str, vm_name: str, reason: str) -> None:
     )
 
 
+def send_vm_deleted_notification(to: str, vm_name: str, reason: str) -> None:
+    content = f"""
+        <h2 style="color: #1e293b; margin-top: 0;">Suppression de votre machine virtuelle</h2>
+        <p>Bonjour,</p>
+        <p>Votre machine virtuelle <b>{vm_name}</b> a été supprimée par un administrateur système.</p>
+        <div style="background-color: #fef2f2; border-left: 4px solid #ef4444; padding: 16px; margin: 24px 0;">
+            <p style="margin: 0, color: #991b1b;"><b>Motif de suppression :</b> {reason}</p>
+        </div>
+        <p>Si vous avez des questions, veuillez contacter le service technique.</p>
+    """
+    send_email(
+        to=to,
+        subject=f"[Horizon ENSPY] Suppression de votre VM {vm_name}",
+        body_html=_get_base_html(content),
+    )
+
+
+def send_extension_request_admin(admin_email: str, user_email: str, vm_name: str) -> None:
+    content = f"""
+        <h2 style="color: #1e293b; margin-top: 0;">Nouvelle demande de prolongation</h2>
+        <p>Bonjour,</p>
+        <p>L'utilisateur <b>{user_email}</b> a demandé une prolongation pour sa machine virtuelle <b>{vm_name}</b>.</p>
+        <p>Veuillez vous connecter au tableau de bord administrateur pour examiner cette demande.</p>
+    """
+    send_email(
+        to=admin_email,
+        subject=f"[Horizon ENSPY] Demande de prolongation : {vm_name}",
+        body_html=_get_base_html(content),
+    )
+
+
+def send_extension_approved_notification(to: str, vm_name: str, new_end: datetime) -> None:
+    date_str = new_end.strftime("%d/%m/%Y à %H:%M")
+    content = f"""
+        <h2 style="color: #1e293b; margin-top: 0;">Prolongation accordée</h2>
+        <p>Bonjour,</p>
+        <p>Votre demande de prolongation pour la machine virtuelle <b>{vm_name}</b> a été approuvée.</p>
+        <div style="background-color: #f0fdf4; border-left: 4px solid #10b981; padding: 16px; margin: 24px 0;">
+            <p style="margin: 0; color: #166534;"><b>Nouvelle date d'expiration :</b> {date_str}</p>
+        </div>
+        <p>Vous pouvez continuer à utiliser votre machine jusqu'à cette date.</p>
+    """
+    send_email(
+        to=to,
+        subject=f"[Horizon ENSPY] Prolongation accordée : {vm_name}",
+        body_html=_get_base_html(content),
+    )
+
+
 def send_shared_space_purge_warning(to: str, vm_name: str, hours_remaining: int) -> None:
     content = f"""
         <h2 style="color: #1e293b; margin-top: 0;">Nettoyage de l'espace temporaire</h2>

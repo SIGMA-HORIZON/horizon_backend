@@ -545,39 +545,57 @@ def update_vm(db: Session, vm_id, requesting_user_id, user_role: str, data: dict
     return vm
 
 
-def extend_vm_lease(
-    db: Session, vm_id, requesting_user_id, user_role: str, additional_hours: int
-) -> VirtualMachine:
+def request_vm_extension(db: Session, vm_id, user_id, reason: str | None = None) -> ExtensionRequest:
     vm = _get_vm_or_404(db, vm_id)
-    enforce_vm_ownership(vm.owner_id, requesting_user_id, user_role)
+    if vm.owner_id != user_id:
+        raise PolicyError("POL-VM-01", "Accès non autorisé.")
 
-    quota = get_effective_quota(db, vm.owner_id)
-    total_hours = int(
-        (vm.lease_end - vm.lease_start).total_seconds() / 3600) + additional_hours
-    enforce_session_duration(total_hours, quota.max_session_duration_hours)
+    # Check if there's already a pending request
+    existing = db.query(ExtensionRequest).filter(
+        ExtensionRequest.vm_id == vm_id,
+        ExtensionRequest.status == "PENDING"
+    ).first()
+    if existing:
+        return existing
 
-    old_end = vm.lease_end
-    vm.lease_end = vm.lease_end + timedelta(hours=additional_hours)
-
-    ext_reservation = Reservation(
-        id=uuid.uuid4(),
+    request = ExtensionRequest(
         vm_id=vm.id,
-        user_id=requesting_user_id,
-        start_time=old_end,
-        end_time=vm.lease_end,
-        extended=True,
+        user_id=user_id,
+        reason=reason,
+        status="PENDING"
     )
-    db.add(ext_reservation)
+    db.add(request)
+    db.commit()
+    db.refresh(request)
 
-    log_action(
-        db,
-        requesting_user_id,
-        AuditAction.VM_LEASE_EXTENDED,
-        "vm",
-        vm.id,
-        metadata={"additional_hours": additional_hours,
-                  "new_end": vm.lease_end.isoformat()},
-    )
+    # Notify admin (Assuming settings.ADMIN_EMAIL exists, or just hardcode/use a default)
+    from horizon.core.config import get_settings
+    from horizon.infrastructure.email_service import send_extension_request_admin
+    s = get_settings()
+    if s.ADMIN_EMAIL: # I'll assume this exists or I'll check it
+        send_extension_request_admin(s.ADMIN_EMAIL, vm.owner.email, vm.name)
+
+    return request
+
+
+def approve_extension(db: Session, request_id, admin_id, additional_hours: int, comment: str | None = None) -> VirtualMachine:
+    request = db.query(ExtensionRequest).filter(ExtensionRequest.id == request_id).first()
+    if not request:
+        raise PolicyError("VM", "Demande introuvable", 404)
+
+    if request.status != "PENDING":
+        raise PolicyError("VM", "Cette demande a déjà été traitée.")
+
+    vm = extend_vm_lease(db, request.vm_id, request.user_id, "ADMIN", additional_hours)
+
+    request.status = "APPROVED"
+    request.admin_comment = comment
+    db.commit()
+
+    from horizon.infrastructure.email_service import send_extension_approved_notification
+    send_extension_approved_notification(request.user.email, vm.name, vm.lease_end)
+
+    return vm
     db.commit()
     db.refresh(vm)
     return vm

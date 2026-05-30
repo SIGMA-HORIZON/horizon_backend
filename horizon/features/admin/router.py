@@ -11,7 +11,7 @@ from horizon.features.admin import schemas
 from horizon.features.admin import service as admin_service
 from horizon.features.vms import service as vm_service
 from horizon.infrastructure.database import get_db
-from horizon.infrastructure.email_service import send_vm_force_stopped
+from horizon.infrastructure.email_service import send_vm_force_stopped, send_vm_deleted_notification
 from horizon.shared.dependencies import AdminUser
 from horizon.shared.audit_service import log_action
 from horizon.shared.models import (
@@ -54,14 +54,70 @@ async def admin_force_stop(
 
     if owner:
         send_vm_force_stopped(owner.email, vm_name,
-                              body.reason or "Arrêt administratif")
+                               body.reason or "Arrêt administratif")
 
     return schemas.AdminForceStopResponse(message=f"VM {vm_name} arrêtée de force.")
 
 
-@router.delete("/vms/{vm_id}", status_code=204, summary="[Admin] Suppression administrative")
+@router.post(
+    "/vms/{vm_id}/delete",
+    status_code=204,
+    summary="[Admin] Suppression administrative avec motif et notification",
+)
+async def admin_delete_vm_with_reason(
+    vm_id: uuid.UUID,
+    body: schemas.AdminDeleteVMRequest,
+    admin: AdminUser,
+    db: Session = Depends(get_db),
+):
+    vm = admin_service.get_vm_or_404(db, vm_id)
+    owner = db.query(User).filter(User.id == vm.owner_id).first()
+    vm_name = vm.name
+
+    await vm_service.delete_vm(db, vm_id, admin.id, admin.role.value)
+
+    if owner:
+        send_vm_deleted_notification(owner.email, vm_name, body.reason)
+
+    return
+
+
+@router.delete("/vms/{vm_id}", status_code=204, summary="[Admin] Suppression administrative (sans raison)")
 async def admin_delete_vm(vm_id: uuid.UUID, admin: AdminUser, db: Session = Depends(get_db)):
     await vm_service.delete_vm(db, vm_id, admin.id, admin.role.value)
+
+
+@router.get(
+    "/vms/extensions",
+    response_model=list[schemas.ExtensionRequestResponse],
+    summary="[Admin] Lister les demandes de prolongation",
+)
+def admin_list_extensions(admin: AdminUser, db: Session = Depends(get_db)):
+    from horizon.shared.models import ExtensionRequest
+    requests = db.query(ExtensionRequest).filter(ExtensionRequest.status == "PENDING").all()
+    
+    # Enrich response with names
+    results = []
+    for r in requests:
+        res = schemas.ExtensionRequestResponse.model_validate(r)
+        res.vm_name = r.vm.name
+        res.username = r.user.username
+        results.append(res)
+    return results
+
+
+@router.post(
+    "/vms/extensions/{req_id}/approve",
+    response_model=schemas.VMResponse,
+    summary="[Admin] Approuver une demande de prolongation",
+)
+def admin_approve_extension(
+    req_id: uuid.UUID,
+    body: schemas.VMExtendRequest,
+    admin: AdminUser,
+    db: Session = Depends(get_db),
+):
+    return vm_service.approve_extension(db, req_id, admin.id, body.additional_hours)
 
 
 @router.post(
