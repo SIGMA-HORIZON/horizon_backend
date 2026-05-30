@@ -13,6 +13,7 @@ from horizon.shared.models.iso_image import (
 from horizon.shared.models.virtual_machine import (
     VirtualMachine,
     Reservation,
+    ExtensionRequest,
     VMStatus,
     PhysicalNode,
 )
@@ -45,6 +46,7 @@ __all__ = [
     "AccountRequestStatus",
     "VirtualMachine",
     "Reservation",
+    "ExtensionRequest",
     "VMStatus",
     "PhysicalNode",
     "IsoProxmoxTemplate",

@@ -14,6 +14,7 @@ from horizon.features.vms.quota_service import count_active_vms, get_effective_q
 from horizon.shared.audit_service import log_action
 from horizon.shared.models import (
     AuditAction,
+    ExtensionRequest,
     ISOImage,
     IsoProxmoxTemplate,
     PhysicalNode,
@@ -578,6 +579,35 @@ def request_vm_extension(db: Session, vm_id, user_id, reason: str | None = None)
     return request
 
 
+def extend_vm_lease(db: Session, vm_id, user_id, user_role, additional_hours: int) -> VirtualMachine:
+    vm = _get_vm_or_404(db, vm_id)
+    if user_role not in ("ADMIN", "SUPER_ADMIN"):
+        enforce_vm_ownership(vm.owner_id, user_id, user_role)
+    
+    enforce_vm_active_lease(vm)
+    
+    quota = get_effective_quota(db, vm.owner_id)
+    current_lease_hours = (vm.lease_end - vm.lease_start).total_seconds() / 3600
+    new_total_hours = current_lease_hours + additional_hours
+    
+    if user_role not in ("ADMIN", "SUPER_ADMIN"):
+        enforce_session_duration(new_total_hours, quota.max_session_duration_hours)
+
+    vm.lease_end += timedelta(hours=additional_hours)
+    
+    log_action(
+        db,
+        user_id,
+        AuditAction.VM_LEASE_EXTENDED,
+        "vm",
+        vm.id,
+        metadata={"additional_hours": additional_hours, "new_lease_end": vm.lease_end.isoformat()},
+    )
+    db.commit()
+    db.refresh(vm)
+    return vm
+
+
 def approve_extension(db: Session, request_id, admin_id, additional_hours: int, comment: str | None = None) -> VirtualMachine:
     request = db.query(ExtensionRequest).filter(ExtensionRequest.id == request_id).first()
     if not request:
@@ -586,7 +616,7 @@ def approve_extension(db: Session, request_id, admin_id, additional_hours: int, 
     if request.status != "PENDING":
         raise PolicyError("VM", "Cette demande a déjà été traitée.")
 
-    vm = extend_vm_lease(db, request.vm_id, request.user_id, "ADMIN", additional_hours)
+    vm = extend_vm_lease(db, request.vm_id, admin_id, "ADMIN", additional_hours)
 
     request.status = "APPROVED"
     request.admin_comment = comment
@@ -595,9 +625,6 @@ def approve_extension(db: Session, request_id, admin_id, additional_hours: int, 
     from horizon.infrastructure.email_service import send_extension_approved_notification
     send_extension_approved_notification(request.user.email, vm.name, vm.lease_end)
 
-    return vm
-    db.commit()
-    db.refresh(vm)
     return vm
 
 

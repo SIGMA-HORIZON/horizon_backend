@@ -11,6 +11,7 @@ from horizon.features.admin import schemas
 from horizon.features.vms import service as vm_service
 from horizon.features.vms.service import _resolve_proxmox_node_name
 from horizon.shared.models import (
+    ExtensionRequest,
     ISOImage,
     IsoProxmoxTemplate,
     ProxmoxNodeMapping,
