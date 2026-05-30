@@ -5,6 +5,7 @@ from typing import Any
 from uuid import UUID
 
 from pydantic import BaseModel, Field, field_validator
+from horizon.features.vms.schemas import VMResponse, VMExtendRequest, ExtensionRequestResponse
 
 
 class AdminVMRowResponse(BaseModel):
