@@ -78,8 +78,10 @@ def list_available_isos(current_user: CurrentUser, db: Session = Depends(get_db)
 @router.get("/quota", summary="Consulter mes quotas")
 def get_my_quota(current_user: CurrentUser, db: Session = Depends(get_db)):
     from horizon.features.vms.quota_service import get_effective_quota, count_active_vms
+    from horizon.features.vms.service import get_user_network_groups
     q = get_effective_quota(db, current_user.id)
     active_vms = count_active_vms(db, current_user.id)
+    network_groups = get_user_network_groups(db, current_user.id)
     return {
         "max_vcpu_per_vm": q.max_vcpu_per_vm,
         "max_ram_gb_per_vm": q.max_ram_gb_per_vm,
@@ -87,7 +89,8 @@ def get_my_quota(current_user: CurrentUser, db: Session = Depends(get_db)):
         "max_simultaneous_vms": q.max_simultaneous_vms,
         "max_session_duration_hours": q.max_session_duration_hours,
         "active_vms_count": active_vms,
-        "remaining_vms": max(0, q.max_simultaneous_vms - active_vms)
+        "remaining_vms": max(0, q.max_simultaneous_vms - active_vms),
+        "network_groups": network_groups,
     }
 
 
@@ -124,25 +127,29 @@ def list_vms(current_user: CurrentUser, db: Session = Depends(get_db)):
     rows = vm_service.get_user_vms(db, current_user.id)
     items = []
     now = datetime.now(timezone.utc)
-    
+    expired_detected = False
+
     for r in rows:
-        # Local check for expiry to ensure immediate consistency in lists
         lease_end = r.lease_end
         if lease_end.tzinfo is None:
             lease_end = lease_end.replace(tzinfo=timezone.utc)
-            
+
         if lease_end <= now and r.status != VMStatus.EXPIRED:
             r.status = VMStatus.EXPIRED
             r.stopped_at = now
-            db.commit()
+            expired_detected = True
             logger.info(f"List: VM {r.id} detected as EXPIRED locally.")
-            
+
         resp = schemas.VMResponse.model_validate(r)
         if r.iso_image:
             resp.os_name = r.iso_image.name
             resp.os_family = r.iso_image.os_family.value if hasattr(r.iso_image.os_family, 'value') else r.iso_image.os_family
             resp.is_template_based = r.iso_image.proxmox_template_map is not None
         items.append(resp)
+
+    if expired_detected:
+        db.commit()
+
     return schemas.VMListResponse(items=items)
 
 
@@ -183,7 +190,8 @@ async def get_vm_console(
             _settings.PROXMOX_HOST,
             _settings.PROXMOX_ROOT_USER,
             _settings.PROXMOX_ROOT_PASSWORD,
-            _settings.PROXMOX_VERIFY_SSL
+            _settings.PROXMOX_VERIFY_SSL,
+            _settings.PROXMOX_PORT,
         )
         ticket, port = _get_vnc_ticket_with_session(
             _settings.PROXMOX_HOST,
@@ -191,7 +199,8 @@ async def get_vm_console(
             vm.proxmox_vmid,
             pve_cookie,
             csrf_token,
-            _settings.PROXMOX_VERIFY_SSL
+            _settings.PROXMOX_VERIFY_SSL,
+            _settings.PROXMOX_PORT,
         )
         
         return {
@@ -215,6 +224,7 @@ async def vnc_proxy_websocket(
     vm_id: str,
     port: str,
     ticket: str,
+    token: str = None,
     db: Session = Depends(get_db),
 ):
     """
@@ -225,7 +235,20 @@ async def vnc_proxy_websocket(
     await websocket.accept(subprotocol="binary")
 
     try:
-        # 1. Look up VM in the database
+        if not token:
+            await websocket.close(code=1008, reason="Authentication required")
+            return
+
+        from horizon.features.auth.service import get_user_from_token
+        try:
+            current_user = get_user_from_token(db, token)
+        except PolicyError as e:
+            await websocket.close(code=1008, reason=e.detail)
+            return
+        except Exception:
+            await websocket.close(code=1008, reason="Erreur d'authentification")
+            return
+
         from horizon.infrastructure.vnc_proxy import proxy_vnc
         vm_uuid = uuid.UUID(vm_id)
         vm = db.query(VirtualMachine).filter(VirtualMachine.id == vm_uuid).first()
@@ -233,9 +256,9 @@ async def vnc_proxy_websocket(
             logger.error(f"VNC: VM {vm_id} not found")
             await websocket.close(code=1008, reason="VM not found")
             return
-        
-        # 1b. Expiry check
+
         try:
+            enforce_vm_ownership(vm.owner_id, current_user.id, current_user.role.value)
             vm_service.enforce_vm_active_lease(vm)
         except Exception as e:
             await websocket.close(code=1008, reason=str(e))
@@ -278,6 +301,7 @@ async def vnc_proxy_websocket(
             root_user=_settings.PROXMOX_ROOT_USER,
             root_password=_settings.PROXMOX_ROOT_PASSWORD,
             verify_ssl=_settings.PROXMOX_VERIFY_SSL,
+            proxmox_port=_settings.PROXMOX_PORT,
         )
 
     except Exception as e:

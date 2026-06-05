@@ -70,6 +70,17 @@ def _resolve_proxmox_node_name(db: Session, physical_node: PhysicalNode) -> str:
     )
 
 
+def _resolve_px_node_for_vm(db: Session, vm: VirtualMachine) -> str:
+    """Resolve the Proxmox node name for a VM, with safe fallbacks for scheduler/monitoring."""
+    try:
+        return _resolve_proxmox_node_name(db, vm.node)
+    except Exception:
+        s = get_settings()
+        if s.PROXMOX_NODE:
+            return s.PROXMOX_NODE
+        return vm.node.value.lower()
+
+
 def _build_net0(vlan_id: int | None) -> str:
     s = get_settings()
     base = s.PROXMOX_NET0_TEMPLATE.strip()
@@ -127,7 +138,12 @@ async def create_vm(db: Session, owner_id, data: dict) -> VirtualMachine:
     enforce_vm_count_limit(active_count, quota.max_simultaneous_vms)
 
     node = _select_node(db)
-    vlan_id = _assign_vlan(db, owner_id)
+    vlan_id = _assign_vlan(
+        db,
+        owner_id,
+        shared_network=data.get("shared_network", True),
+        shared_vlan_id=data.get("shared_vlan_id"),
+    )
 
     now = datetime.now(timezone.utc)
     vm = VirtualMachine(
@@ -224,6 +240,8 @@ async def create_vm(db: Session, owner_id, data: dict) -> VirtualMachine:
                 "vcpu": data["vcpu"],
                 "ram_gb": data["ram_gb"],
                 "session_hours": data["session_hours"],
+                "vlan_id": vlan_id,
+                "shared_network": data.get("shared_network", True),
             },
         )
         vm.status = VMStatus.ACTIVE
@@ -250,6 +268,27 @@ async def create_vm_directly(db: Session, owner_id, body: schemas.ProxmoxCreateV
     _require_proxmox_enabled()
     s = get_settings()
     now = datetime.now(timezone.utc)
+
+    ram_gb = round(float(body.ram_mb) / 1024.0, 3)
+    quota = get_effective_quota(db, owner_id)
+    enforce_hard_limits(body.vcpu, ram_gb, float(body.storage_gb), body.session_hours)
+    enforce_vm_resource_limits(
+        body.vcpu,
+        ram_gb,
+        float(body.storage_gb),
+        quota.max_vcpu_per_vm,
+        quota.max_ram_gb_per_vm,
+        quota.max_storage_gb_per_vm,
+    )
+    enforce_session_duration(body.session_hours, quota.max_session_duration_hours)
+    active_count = count_active_vms(db, owner_id)
+    enforce_vm_count_limit(active_count, quota.max_simultaneous_vms)
+
+    proxmox_vmid = body.vmid if body.vmid is not None else _next_proxmox_vmid(db)
+    if body.vmid is not None:
+        taken = db.query(VirtualMachine).filter(VirtualMachine.proxmox_vmid == body.vmid).first()
+        if taken:
+            proxmox_vmid = _next_proxmox_vmid(db)
 
     # 1. Automate Node Selection (Scheduler)
     target_node = s.PROXMOX_NODE # Use setting if provided
@@ -290,7 +329,12 @@ async def create_vm_directly(db: Session, owner_id, body: schemas.ProxmoxCreateV
         target_node = body.node
 
     # 2. Network Isolation (VLAN)
-    vlan_id = _assign_vlan(db, owner_id)
+    vlan_id = _assign_vlan(
+        db,
+        owner_id,
+        shared_network=body.shared_network,
+        shared_vlan_id=body.shared_vlan_id,
+    )
     net0 = _build_net0(vlan_id)
     # If the user provided a custom net0 but it doesn't specify a tag, we could consider overriding or merging
     # For now, we prioritize the isolated network string from _build_net0 if it's the default
@@ -320,7 +364,7 @@ async def create_vm_directly(db: Session, owner_id, body: schemas.ProxmoxCreateV
     # Stage the VM record before touching Proxmox
     vm = VirtualMachine(
         id=_uuid.uuid4(),
-        proxmox_vmid=body.vmid,
+        proxmox_vmid=proxmox_vmid,
         name=body.name,
         description=None,
         owner_id=owner_id,
@@ -372,11 +416,11 @@ async def create_vm_directly(db: Session, owner_id, body: schemas.ProxmoxCreateV
             logger.error(f"Failed to init ProxmoxClient: {e}")
             raise PolicyError("PROXMOX", e.message, e.status_code) from e
 
-        logger.info(f"Initiating Proxmox call: node={target_node}, vmid={body.vmid}, name={body.name}")
+        logger.info(f"Initiating Proxmox call: node={target_node}, vmid={proxmox_vmid}, name={body.name}")
         try:
             res = await client.create_vm(
                 node=target_node,
-                vmid=body.vmid,
+                vmid=proxmox_vmid,
                 name=body.name,
                 storage=body.storage or s.PROXMOX_VM_STORAGE,
                 iso_filename=body.iso_filename,
@@ -387,7 +431,7 @@ async def create_vm_directly(db: Session, owner_id, body: schemas.ProxmoxCreateV
                 net0=final_net0,
                 ssh_key=public_key_to_inject,
             )
-            await client.start_vm(node=target_node, vmid=body.vmid)
+            await client.start_vm(node=target_node, vmid=proxmox_vmid)
         except ProxmoxIntegrationError as e:
             raise PolicyError("PROXMOX", e.message, e.status_code) from e
 
@@ -594,7 +638,17 @@ def extend_vm_lease(db: Session, vm_id, user_id, user_role, additional_hours: in
         enforce_session_duration(new_total_hours, quota.max_session_duration_hours)
 
     vm.lease_end += timedelta(hours=additional_hours)
-    
+
+    reservation = (
+        db.query(Reservation)
+        .filter(Reservation.vm_id == vm.id)
+        .order_by(Reservation.created_at.desc())
+        .first()
+    )
+    if reservation:
+        reservation.end_time = vm.lease_end
+        reservation.extended = True
+
     log_action(
         db,
         user_id,
@@ -713,9 +767,10 @@ def _get_vm_or_404(db: Session, vm_id) -> VirtualMachine:
     return vm
 
 
-def _select_node(db: Session, storage: str = "stockage.ceph") -> PhysicalNode:
+def _select_node(db: Session, storage: str | None = None) -> PhysicalNode:
     nodes = [PhysicalNode.REM, PhysicalNode.RAM, PhysicalNode.EMILIA]
     s = get_settings()
+    storage = storage or s.PROXMOX_VM_STORAGE
 
     if s.PROXMOX_ENABLED:
         try:
@@ -761,10 +816,13 @@ def _next_proxmox_vmid(db: Session) -> int:
             from horizon.infrastructure.proxmox_client import ProxmoxClient
             client = ProxmoxClient()
             if client.enabled:
-                # Vérifier tous les IDs réservés sur le cluster Proxmox
+                try:
+                    cluster_next = client.get_next_vmid()
+                    candidate = max(candidate, cluster_next)
+                except Exception:
+                    pass
                 resources = client.api.cluster.resources.get(type="vm")
                 taken_proxmox_ids = {r["vmid"] for r in resources}
-                
                 while candidate in taken_proxmox_ids:
                     candidate += 1
         except Exception:
@@ -773,16 +831,68 @@ def _next_proxmox_vmid(db: Session) -> int:
     return candidate
 
 
-def _assign_vlan(db: Session, owner_id) -> int:
-    existing = (
+def get_user_network_groups(db: Session, owner_id) -> list[dict]:
+    """List VLAN groups owned by the user (for network choice in VM creation)."""
+    vms = (
         db.query(VirtualMachine)
         .filter(
             VirtualMachine.owner_id == owner_id,
             VirtualMachine.vlan_id.isnot(None),
         )
-        .first()
+        .order_by(VirtualMachine.created_at.desc())
+        .all()
     )
-    if existing:
-        return existing.vlan_id
+    groups: dict[int, dict] = {}
+    for vm in vms:
+        vid = vm.vlan_id
+        if vid not in groups:
+            groups[vid] = {"vlan_id": vid, "vm_count": 0, "vm_names": []}
+        groups[vid]["vm_count"] += 1
+        if vm.name not in groups[vid]["vm_names"]:
+            groups[vid]["vm_names"].append(vm.name)
+    return sorted(groups.values(), key=lambda g: g["vlan_id"])
+
+
+def _assign_vlan(
+    db: Session,
+    owner_id,
+    shared_network: bool = True,
+    shared_vlan_id: int | None = None,
+) -> int:
+    """Assign a VLAN tag for the new VM.
+
+    - shared_network=True  → join an existing user VLAN (or create one if first VM)
+    - shared_network=False → always allocate a new isolated VLAN
+    """
+    if shared_network:
+        if shared_vlan_id is not None:
+            owned = (
+                db.query(VirtualMachine)
+                .filter(
+                    VirtualMachine.owner_id == owner_id,
+                    VirtualMachine.vlan_id == shared_vlan_id,
+                )
+                .first()
+            )
+            if not owned:
+                raise PolicyError(
+                    "POL-RESEAU-02",
+                    f"Le réseau VLAN {shared_vlan_id} ne correspond à aucune de vos VMs.",
+                    422,
+                )
+            return shared_vlan_id
+
+        existing = (
+            db.query(VirtualMachine)
+            .filter(
+                VirtualMachine.owner_id == owner_id,
+                VirtualMachine.vlan_id.isnot(None),
+            )
+            .order_by(VirtualMachine.created_at.desc())
+            .first()
+        )
+        if existing:
+            return existing.vlan_id
+
     max_vlan = db.query(func.max(VirtualMachine.vlan_id)).scalar()
     return (max_vlan or 99) + 1

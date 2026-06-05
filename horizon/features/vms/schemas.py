@@ -15,6 +15,14 @@ class VMCreateRequest(BaseModel):
     session_hours: int = 2
     description: str | None = None
     ssh_public_key: str | None = None
+    shared_network: bool = Field(
+        default=True,
+        description="True = join an existing user network (VLAN); False = isolated dedicated VLAN",
+    )
+    shared_vlan_id: int | None = Field(
+        default=None,
+        description="When shared_network is true, optionally pick which existing VLAN to join",
+    )
 
     model_config = {
         "populate_by_name": True,  # Permet d'utiliser soit le nom réel soit l'alias
@@ -35,7 +43,7 @@ class VMCreateRequest(BaseModel):
         return v
 
 class ProxmoxCreateVMRequest(BaseModel):
-    vmid: int = Field(..., ge=100)
+    vmid: int | None = Field(default=None, ge=100, description="Auto-assigned if omitted or already taken")
     node: str | None = None
     storage: str | None = Field(default=None, description="Stockage cible pour les disques")
     iso_storage: str | None = Field(default=None)
@@ -48,6 +56,8 @@ class ProxmoxCreateVMRequest(BaseModel):
     owner_id: str | None = None
     ssh_public_key: str | None = None
     session_hours: int = 24
+    shared_network: bool = Field(default=True)
+    shared_vlan_id: int | None = None
 
 
 class VMUpdateRequest(BaseModel):
@@ -71,6 +81,7 @@ class VMResponse(BaseModel):
     lease_start: datetime
     lease_end: datetime
     ip_address: str | None
+    vlan_id: int | None = None
     ssh_public_key: str | None = None
     cpu_usage: float | None = 0.0
     ram_usage: float | None = 0.0

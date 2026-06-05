@@ -54,7 +54,7 @@ def task_expire_vms():
         )
         # If configured, attempt to delete expired VMs on Proxmox and remove DB rows.
         from horizon.infrastructure.proxmox_client import ProxmoxClient
-        from horizon.shared.models import ProxmoxNodeMapping
+        from horizon.features.vms.service import _resolve_px_node_for_vm
 
         client = None
         if settings.PROXMOX_ENABLED and settings.PROXMOX_DELETE_ON_EXPIRY:
@@ -77,36 +77,33 @@ def task_expire_vms():
 
             logger.info("[POL-RESSOURCES-01] VM %s expirée", vm.id)
 
-            # Attempt immediate deletion if configured and Proxmox client is available
             if client and client.enabled:
                 try:
-                    mapping = db.query(ProxmoxNodeMapping).filter(
-                        ProxmoxNodeMapping.physical_node == vm.node
-                    ).first()
-                    px_node = mapping.proxmox_node_name if mapping else vm.node
-                    # Delete on Proxmox
-                    try:
-                        # call proxmox delete (purge)
-                        import asyncio as _asyncio
+                    import asyncio as _asyncio
 
-                        # Run the async delete in a fresh loop
-                        _asyncio.run(client.delete_vm(px_node, vm.proxmox_vmid))
-                        # Log and remove DB entry
-                        log_action(
-                            db,
-                            None,
-                            AuditAction.VM_DELETED,
-                            "vm",
-                            vm.id,
-                            metadata={"auto": True, "reason": "expired_and_auto_deleted"},
-                        )
-                        logger.info("[POL-RESSOURCES-01] VM %s supprimée de Proxmox et DB (auto)", vm.id)
-                        db.delete(vm)
+                    px_node = _resolve_px_node_for_vm(db, vm)
+                    try:
+                        _asyncio.run(client.stop_vm(px_node, vm.proxmox_vmid))
                     except Exception as e:
-                        logger.error("[POL-RESSOURCES-01] Échec suppression Proxmox pour VM %s: %s", vm.id, e)
-                        # keep DB record marked as EXPIRED for later manual or automatic cleanup
+                        logger.warning("[POL-RESSOURCES-01] Arrêt Proxmox échoué pour VM %s: %s", vm.id, e)
+
+                    if settings.PROXMOX_DELETE_ON_EXPIRY:
+                        try:
+                            _asyncio.run(client.delete_vm(px_node, vm.proxmox_vmid))
+                            log_action(
+                                db,
+                                None,
+                                AuditAction.VM_DELETED,
+                                "vm",
+                                vm.id,
+                                metadata={"auto": True, "reason": "expired_and_auto_deleted"},
+                            )
+                            logger.info("[POL-RESSOURCES-01] VM %s supprimée de Proxmox et DB (auto)", vm.id)
+                            db.delete(vm)
+                        except Exception as e:
+                            logger.error("[POL-RESSOURCES-01] Échec suppression Proxmox pour VM %s: %s", vm.id, e)
                 except Exception as e:
-                    logger.error("[POL-RESSOURCES-01] Erreur en tentant de supprimer VM %s: %s", vm.id, e)
+                    logger.error("[POL-RESSOURCES-01] Erreur Proxmox pour VM expirée %s: %s", vm.id, e)
 
         db.commit()
     except Exception as e:
@@ -277,12 +274,12 @@ def task_handle_inactive_accounts():
 
 
 def task_monitor_vms():
-    from horizon.shared.models import VirtualMachine, VMStatus, ProxmoxNodeMapping
+    from horizon.shared.models import VirtualMachine, VMStatus
     from horizon.infrastructure.proxmox_client import ProxmoxClient
+    from horizon.features.vms.service import _resolve_px_node_for_vm
 
     db = _get_db()
     try:
-        # On ne synchronise que les VMs actives qui n'ont pas encore d'IP (ou pour mise à jour)
         active_vms = db.query(VirtualMachine).filter(VirtualMachine.status == VMStatus.ACTIVE).all()
         
         if not active_vms:
@@ -293,11 +290,7 @@ def task_monitor_vms():
             return
 
         for vm in active_vms:
-            # Résoudre le nom du nœud Proxmox
-            mapping = db.query(ProxmoxNodeMapping).filter(
-                ProxmoxNodeMapping.physical_node == vm.node
-            ).first()
-            px_node = mapping.proxmox_node_name if mapping else vm.node
+            px_node = _resolve_px_node_for_vm(db, vm)
             
             try:
                 # Vérifier si la VM existe encore sur Proxmox

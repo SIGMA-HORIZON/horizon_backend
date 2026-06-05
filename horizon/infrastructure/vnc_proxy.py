@@ -21,7 +21,21 @@ import json
 logger = logging.getLogger(__name__)
 
 
-def _proxmox_session_login(proxmox_host: str, root_user: str, root_password: str, verify_ssl: bool = False) -> tuple[str, str]:
+def _proxmox_api_origin(proxmox_host: str, proxmox_port: int = 8006) -> str:
+    """Build the Proxmox API origin (scheme + host + port)."""
+    host = proxmox_host.strip()
+    if ":" in host and not host.startswith("["):
+        return f"https://{host}"
+    return f"https://{host}:{proxmox_port}"
+
+
+def _proxmox_session_login(
+    proxmox_host: str,
+    root_user: str,
+    root_password: str,
+    verify_ssl: bool = False,
+    proxmox_port: int = 8006,
+) -> tuple[str, str]:
     """Login and return (pve_cookie, csrf_token)."""
     ctx = ssl.create_default_context()
     if not verify_ssl:
@@ -30,7 +44,7 @@ def _proxmox_session_login(proxmox_host: str, root_user: str, root_password: str
 
     data = urllib.parse.urlencode({"username": root_user, "password": root_password}).encode()
     req = urllib.request.Request(
-        f"https://{proxmox_host}:8006/api2/json/access/ticket",
+        f"{_proxmox_api_origin(proxmox_host, proxmox_port)}/api2/json/access/ticket",
         method="POST",
         data=data,
     )
@@ -46,6 +60,7 @@ def _get_vnc_ticket_with_session(
     pve_cookie: str,
     csrf_token: str,
     verify_ssl: bool = False,
+    proxmox_port: int = 8006,
 ) -> tuple[str, str]:
     """Get a VNC ticket using a session cookie. Returns (ticket, port)."""
     ctx = ssl.create_default_context()
@@ -54,7 +69,7 @@ def _get_vnc_ticket_with_session(
         ctx.verify_mode = ssl.CERT_NONE
 
     req = urllib.request.Request(
-        f"https://{proxmox_host}:8006/api2/json/nodes/{node}/qemu/{vmid}/vncproxy",
+        f"{_proxmox_api_origin(proxmox_host, proxmox_port)}/api2/json/nodes/{node}/qemu/{vmid}/vncproxy",
         method="POST",
         headers={
             "Cookie": f"PVEAuthCookie={pve_cookie}",
@@ -78,6 +93,7 @@ async def proxy_vnc(
     root_user: str = "root@pam",
     root_password: str = "",
     verify_ssl: bool = False,
+    proxmox_port: int = 8006,
     **kwargs,
 ):
     """
@@ -101,7 +117,9 @@ async def proxy_vnc(
 
     # 1. Login as root@pam to get a session
     try:
-        pve_cookie, csrf_token = _proxmox_session_login(proxmox_host, root_user, root_password, verify_ssl)
+        pve_cookie, csrf_token = _proxmox_session_login(
+            proxmox_host, root_user, root_password, verify_ssl, proxmox_port
+        )
         logger.info(f"VNC proxy: obtained PVEAuthCookie for vmid={vmid}")
     except Exception as e:
         logger.error(f"VNC proxy: login failed: {e}")
@@ -120,8 +138,10 @@ async def proxy_vnc(
 
     # 3. Build the Proxmox WS URL
     encoded_ticket = urllib.parse.quote(vnc_ticket, safe="")
+    api_origin = _proxmox_api_origin(proxmox_host, proxmox_port)
+    ws_origin = api_origin.replace("https://", "wss://")
     px_url = (
-        f"wss://{proxmox_host}:8006/api2/json/nodes/{node}/qemu/{vmid}"
+        f"{ws_origin}/api2/json/nodes/{node}/qemu/{vmid}"
         f"/vncwebsocket?port={vnc_port}&vncticket={encoded_ticket}"
     )
 

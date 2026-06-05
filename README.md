@@ -2,6 +2,8 @@
 
 Monorepo unique : package Python **`horizon/`** à la racine du dépôt, architecture par fonctionnalités (`features/`), couches `shared/` et `infrastructure/`.
 
+> **Déploiement lab / production** : voir le guide complet à la racine du monorepo — [`../DEPLOYMENT.md`](../DEPLOYMENT.md) (Docker Compose, Proxmox, variables d’environnement, dépannage).
+
 ## Prérequis
 
 - Python 3.11+ (recommandé ; les tests ont été validés avec 3.12 en local)
@@ -9,7 +11,7 @@ Monorepo unique : package Python **`horizon/`** à la racine du dépôt, archite
 
 ## Configuration
 
-Copier `.env.example` vers `.env` à la racine et ajuster les secrets (`JWT_SECRET_KEY`, `APP_SECRET_KEY`, etc.). Pour Compose, les variables critiques peuvent aussi être surchargées dans `docker-compose.yml`.
+Copier `.env.example` vers `.env` dans `horizon-backend/` et ajuster les secrets (`JWT_SECRET_KEY`, `APP_SECRET_KEY`, etc.). Pour Compose, les variables critiques peuvent aussi être surchargées dans `docker-compose.yml` à la racine du monorepo.
 
 ## Démarrage avec Docker
 
@@ -52,9 +54,9 @@ L’intégration **proxmoxer** est **désactivée par défaut** (`PROXMOX_ENABLE
 Pour l’activer :
 
 1. Appliquer les migrations (`alembic upgrade head`) — la révision `0002` crée les tables `iso_proxmox_templates` et `proxmox_node_mappings` (lignes d’exemple pour REM / RAM / EMILIA).
-2. Renseigner dans `.env` : `PROXMOX_ENABLED=true`, `PROXMOX_HOST`, `PROXMOX_USER`, `PROXMOX_TOKEN_ID`, `PROXMOX_TOKEN_SECRET`, `PROXMOX_VERIFY_SSL` (souvent `false` en labo).
+2. Renseigner dans `.env` : `PROXMOX_ENABLED=true`, `PROXMOX_HOST`, `PROXMOX_USER`, `PROXMOX_TOKEN_NAME`, `PROXMOX_TOKEN_VALUE`, `PROXMOX_ROOT_PASSWORD` (requis pour la console VNC), `PROXMOX_VERIFY_SSL` (souvent `false` en labo).
 3. Ajuster les **mappings** nœud métier → nom de nœud Proxmox (API admin ou table `proxmox_node_mappings`) et une ligne **par ISO** dans `iso_proxmox_templates` (VMID du template à cloner).
-4. Optionnel : `PROXMOX_DEFAULT_NODE` si un nœud métier n’a pas encore de ligne de mapping ; `PROXMOX_NET0_TEMPLATE` pour le modèle `net0` (ex. `virtio,bridge=vmbr0`), complété par `,tag={vlan_id}` si la VM a un VLAN.
+4. Optionnel : `PROXMOX_NODE` si un nœud métier n’a pas encore de ligne de mapping ; `PROXMOX_NET0_TEMPLATE` pour le modèle `net0` (ex. `virtio,bridge=vmbr0`), complété par `,tag={vlan_id}` si la VM a un VLAN.
 
 Après un **seed** local, des correspondances ISO → template **fictives** (VMID `9000+`) sont insérées : à remplacer en production par les vrais ID de templates Proxmox.
 

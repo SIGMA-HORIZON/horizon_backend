@@ -97,7 +97,7 @@ def assert_known_proxmox_node_name(db: Session, node_name: str) -> None:
         )
 
 
-def admin_proxmox_pause_by_vmid(db: Session, proxmox_vmid: int) -> schemas.ProxmoxOperationResponse:
+async def admin_proxmox_pause_by_vmid(db: Session, proxmox_vmid: int) -> schemas.ProxmoxOperationResponse:
     from horizon.infrastructure.proxmox_client import ProxmoxClient, ProxmoxIntegrationError
 
     _require_proxmox_enabled()
@@ -108,7 +108,7 @@ def admin_proxmox_pause_by_vmid(db: Session, proxmox_vmid: int) -> schemas.Proxm
     px_node = _resolve_proxmox_node_name(db, vm.node)
     try:
         client = ProxmoxClient()
-        out = client.pause_vm(px_node, proxmox_vmid)
+        out = await client.pause_vm(px_node, proxmox_vmid)
     except ProxmoxIntegrationError as e:
         raise PolicyError("PROXMOX", e.message, e.status_code) from e
     return schemas.ProxmoxOperationResponse(status=out["status"], message=out["message"])

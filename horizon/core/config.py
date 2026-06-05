@@ -33,6 +33,8 @@ class Settings(BaseSettings):
     EMAIL_FROM: str = "no-reply@horizon.enspy.cm"
     EMAIL_FROM_NAME: str = "Horizon ENSPY"
     ADMIN_EMAIL: str = "admin@horizon.enspy.cm"
+    # Public URL of the Next.js frontend (used in notification emails)
+    FRONTEND_BASE_URL: str = "http://localhost:3010"
 
     BCRYPT_ROUNDS: int = 12
     ENFORCE_HTTPS: bool = False

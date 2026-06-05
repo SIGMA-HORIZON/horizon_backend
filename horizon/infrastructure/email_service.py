@@ -54,6 +54,13 @@ def send_email(to: str, subject: str, body_html: str) -> None:
         _send_mock(to, subject, body_html)
 
 
+def _frontend_url(path: str = "") -> str:
+    base = settings.FRONTEND_BASE_URL.rstrip("/")
+    if not path:
+        return base
+    return f"{base}/{path.lstrip('/')}"
+
+
 def _get_base_html(content: str) -> str:
     return f"""
     <html>
@@ -86,7 +93,7 @@ def send_account_credentials(to: str, username: str, temp_password: str) -> None
         </div>
         <p style="color: #ef4444; font-weight: 600;">⚠️ Vous devrez impérativement changer ce mot de passe lors de votre première connexion.</p>
         <div style="text-align: center; margin-top: 32px;">
-            <a href="http://localhost:3010/connexion" style="background-color: #2563eb; color: #ffffff; padding: 12px 32px; text-decoration: none; border-radius: 6px; font-weight: 600; display: inline-block;">Accéder à la plateforme</a>
+            <a href="{_frontend_url('connexion')}" style="background-color: #2563eb; color: #ffffff; padding: 12px 32px; text-decoration: none; border-radius: 6px; font-weight: 600; display: inline-block;">Accéder à la plateforme</a>
         </div>
     """
     send_email(
@@ -103,7 +110,7 @@ def send_account_request_received(to: str, first_name: str) -> None:
         <p>Votre demande de création de compte sur <strong>Horizon</strong> a bien été enregistrée dans notre système.</p>
         <p>Un administrateur va examiner votre profil et la justification fournie. Vous recevrez une notification par e-mail dès qu'une décision sera prise.</p>
         <div style="text-align: center; margin-top: 32px;">
-            <a href="http://localhost:3010" style="color: #2563eb; font-weight: 600; text-decoration: none;">Visiter le site Horizon</a>
+            <a href="{_frontend_url()}" style="color: #2563eb; font-weight: 600; text-decoration: none;">Visiter le site Horizon</a>
         </div>
     """
     send_email(
@@ -137,7 +144,7 @@ def send_inactivity_warning(to: str, username: str, days_remaining: int) -> None
         <p>Votre compte Horizon est inactif depuis plus de <b>83 jours</b>.</p>
         <p>Conformément à notre politique de gestion des ressources (POL-COMPTE-03), votre accès sera <b>suspendu dans {days_remaining} jours</b> si aucune connexion n'est détectée.</p>
         <div style="text-align: center; margin-top: 32px;">
-            <a href="http://localhost:3010/connexion" style="background-color: #2563eb; color: #ffffff; padding: 12px 32px; text-decoration: none; border-radius: 6px; font-weight: 600; display: inline-block;">Se connecter maintenant</a>
+            <a href="{_frontend_url('connexion')}" style="background-color: #2563eb; color: #ffffff; padding: 12px 32px; text-decoration: none; border-radius: 6px; font-weight: 600; display: inline-block;">Se connecter maintenant</a>
         </div>
     """
     send_email(
@@ -168,7 +175,7 @@ def send_vm_expiry_warning(to: str, vm_name: str, minutes_remaining: int) -> Non
         <p>Il reste environ <b>{minutes_remaining} minutes</b> avant que la machine ne soit automatiquement éteinte.</p>
         <p>Connectez-vous sur le dashboard pour prolonger votre session si des ressources sont encore disponibles.</p>
         <div style="text-align: center; margin-top: 32px;">
-            <a href="http://localhost:3010/dashboard" style="background-color: #2563eb; color: #ffffff; padding: 12px 24px; text-decoration: none; border-radius: 6px; font-weight: 600; display: inline-block;">Gérer mes VMs</a>
+            <a href="{_frontend_url('dashboard')}" style="background-color: #2563eb; color: #ffffff; padding: 12px 24px; text-decoration: none; border-radius: 6px; font-weight: 600; display: inline-block;">Gérer mes VMs</a>
         </div>
     """
     send_email(
@@ -199,7 +206,7 @@ def send_vm_deleted_notification(to: str, vm_name: str, reason: str) -> None:
         <p>Bonjour,</p>
         <p>Votre machine virtuelle <b>{vm_name}</b> a été supprimée par un administrateur système.</p>
         <div style="background-color: #fef2f2; border-left: 4px solid #ef4444; padding: 16px; margin: 24px 0;">
-            <p style="margin: 0, color: #991b1b;"><b>Motif de suppression :</b> {reason}</p>
+            <p style="margin: 0; color: #991b1b;"><b>Motif de suppression :</b> {reason}</p>
         </div>
         <p>Si vous avez des questions, veuillez contacter le service technique.</p>
     """
@@ -270,7 +277,7 @@ def send_admin_security_alert(
             </table>
         </div>
         <div style="text-align: center; margin-top: 32px;">
-            <a href="http://localhost:3010/admin" style="background-color: #dc2626; color: #ffffff; padding: 12px 32px; text-decoration: none; border-radius: 6px; font-weight: 600; display: inline-block;">Investiguer dans l'Admin</a>
+            <a href="{_frontend_url('admin')}" style="background-color: #dc2626; color: #ffffff; padding: 12px 32px; text-decoration: none; border-radius: 6px; font-weight: 600; display: inline-block;">Investiguer dans l'Admin</a>
         </div>
     """
     for email in admin_emails:
@@ -292,7 +299,7 @@ def send_admin_new_request(
             <p style="margin: 0;"><b>Institution :</b> {organisation.upper()}</p>
         </div>
         <div style="text-align: center; margin-top: 32px;">
-            <a href="http://localhost:3010/admin/demandes" style="background-color: #2563eb; color: #ffffff; padding: 12px 32px; text-decoration: none; border-radius: 6px; font-weight: 600; display: inline-block;">Gérer les demandes</a>
+            <a href="{_frontend_url('admin/demandes')}" style="background-color: #2563eb; color: #ffffff; padding: 12px 32px; text-decoration: none; border-radius: 6px; font-weight: 600; display: inline-block;">Gérer les demandes</a>
         </div>
     """
     for email in admin_emails:

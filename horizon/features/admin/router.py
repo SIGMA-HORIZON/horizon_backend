@@ -210,8 +210,8 @@ def get_violations(
     response_model=schemas.ProxmoxOperationResponse,
     summary="[Admin] Pause Proxmox (suspend) - proxmox_vmid Horizon",
 )
-def admin_proxmox_pause(proxmox_vmid: int, admin: AdminUser, db: Session = Depends(get_db)):
-    return admin_service.admin_proxmox_pause_by_vmid(db, proxmox_vmid)
+async def admin_proxmox_pause(proxmox_vmid: int, admin: AdminUser, db: Session = Depends(get_db)):
+    return await admin_service.admin_proxmox_pause_by_vmid(db, proxmox_vmid)
 
 
 @router.get(
