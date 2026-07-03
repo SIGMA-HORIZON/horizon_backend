@@ -539,11 +539,17 @@ async def delete_vm(db: Session, vm_id, requesting_user_id, user_role: str) -> N
                 if vm.status == VMStatus.ACTIVE:
                     try:
                         await client.stop_vm(px_node, vm.proxmox_vmid)
-                    except ProxmoxIntegrationError:
+                    except Exception:
                         pass
                 await client.delete_vm(px_node, vm.proxmox_vmid)
             except ProxmoxIntegrationError as e:
-                raise PolicyError("PROXMOX", e.message, e.status_code) from e
+                # If VM is not found on Proxmox, we log warning and proceed with DB deletion
+                if "does not exist" in str(e).lower() or e.status_code == 404:
+                    logger.warning(f"VM {vm.proxmox_vmid} not found on Proxmox node {px_node}. Allowing DB deletion.")
+                else:
+                    raise PolicyError("PROXMOX", e.message, e.status_code) from e
+            except Exception as e:
+                logger.error(f"Unexpected Proxmox error during VM deletion: {e}. Allowing DB deletion.")
 
     log_action(db, requesting_user_id, action, "vm", vm.id)
     db.delete(vm)
@@ -771,6 +777,14 @@ def _select_node(db: Session, storage: str | None = None) -> PhysicalNode:
     nodes = [PhysicalNode.REM, PhysicalNode.RAM, PhysicalNode.EMILIA]
     s = get_settings()
     storage = storage or s.PROXMOX_VM_STORAGE
+
+    # If a default node is forced in settings (e.g. emilia), respect it directly
+    if s.PROXMOX_NODE:
+        node_name_upper = s.PROXMOX_NODE.upper()
+        for n in nodes:
+            if n.value == node_name_upper:
+                logger.info(f"Scheduler: forcing node {n.value} based on PROXMOX_NODE setting.")
+                return n
 
     if s.PROXMOX_ENABLED:
         try:

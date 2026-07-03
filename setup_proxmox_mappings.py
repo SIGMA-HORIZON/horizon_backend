@@ -27,9 +27,9 @@ DEFAULT_PX_NODE = os.getenv("PROXMOX_NODE", "pve1")
 
 # Map PhysicalNode (REM, RAM, EMILIA) to your Proxmox node name
 NODE_MAPPINGS = {
-    PhysicalNode.REM: "rem",
-    PhysicalNode.RAM: "ram",
-    PhysicalNode.EMILIA: "emilia",
+    PhysicalNode.REM: "pve",
+    PhysicalNode.RAM: "pve",
+    PhysicalNode.EMILIA: "pve",
 }
 
 # Map ISO filename to Proxmox Template VMID

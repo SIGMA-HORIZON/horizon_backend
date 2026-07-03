@@ -116,31 +116,72 @@ def task_expire_vms():
 def task_delete_old_vms():
     from horizon.shared.audit_service import log_action
     from horizon.shared.models import AuditAction, VirtualMachine, VMStatus
+    from horizon.infrastructure.proxmox_client import ProxmoxClient
+    from horizon.features.vms.service import _resolve_px_node_for_vm
 
     db = _get_db()
     try:
-        threshold = datetime.now(timezone.utc) - timedelta(
-            days=settings.VM_AUTO_DELETE_AFTER_STOPPED_DAYS
-        )
+        now = datetime.now(timezone.utc)
+        threshold_stopped = now - timedelta(days=settings.VM_AUTO_DELETE_AFTER_STOPPED_DAYS)
+        threshold_expired = now - timedelta(hours=24)
+
+        # Query VMs that meet the deletion criteria:
+        # 1. STOPPED VMs stopped older than VM_AUTO_DELETE_AFTER_STOPPED_DAYS
+        # 2. EXPIRED VMs whose lease ended more than 24 hours ago
         old_vms = (
             db.query(VirtualMachine)
             .filter(
-                VirtualMachine.status.in_([VMStatus.STOPPED, VMStatus.EXPIRED]),
-                VirtualMachine.stopped_at <= threshold,
+                (
+                    (VirtualMachine.status == VMStatus.STOPPED) &
+                    (VirtualMachine.stopped_at <= threshold_stopped)
+                ) |
+                (
+                    (VirtualMachine.status == VMStatus.EXPIRED) &
+                    (
+                        (VirtualMachine.stopped_at <= threshold_stopped) |
+                        (VirtualMachine.lease_end <= threshold_expired)
+                    )
+                )
             )
             .all()
         )
+
+        client = None
+        if settings.PROXMOX_ENABLED:
+            try:
+                client = ProxmoxClient()
+            except Exception as e:
+                logger.error("[task_delete_old_vms] Impossible d'initialiser ProxmoxClient: %s", e)
+
         for vm in old_vms:
+            # Delete on Proxmox if client is active
+            if client and client.enabled:
+                try:
+                    import asyncio as _asyncio
+                    px_node = _resolve_px_node_for_vm(db, vm)
+                    try:
+                        # Ensure stopped first
+                        _asyncio.run(client.stop_vm(px_node, vm.proxmox_vmid))
+                    except Exception:
+                        pass
+                    try:
+                        _asyncio.run(client.delete_vm(px_node, vm.proxmox_vmid))
+                        logger.info("[task_delete_old_vms] VM %s supprimée de Proxmox (auto)", vm.id)
+                    except Exception as e:
+                        logger.error("[task_delete_old_vms] Échec suppression Proxmox pour VM %s: %s", vm.id, e)
+                except Exception as e:
+                    logger.error("[task_delete_old_vms] Erreur Proxmox pour VM %s: %s", vm.id, e)
+
             log_action(
                 db,
                 None,
                 AuditAction.VM_DELETED,
                 "vm",
                 vm.id,
-                metadata={"reason": "auto_delete_after_7_days"},
+                metadata={"reason": "auto_delete_expired_or_old"},
             )
             db.delete(vm)
-            logger.info("[POL-RESSOURCES-01] VM %s supprimée automatiquement", vm.id)
+            logger.info("[task_delete_old_vms] VM %s supprimée de la DB", vm.id)
         db.commit()
     except Exception as e:
         logger.error("[task_delete_old_vms] Erreur : %s", e)
@@ -357,7 +398,7 @@ def start_scheduler():
     )
     scheduler.add_job(
         task_delete_old_vms,
-        IntervalTrigger(hours=24),
+        IntervalTrigger(hours=1),
         id="delete_old_vms",
         replace_existing=True,
     )

@@ -459,9 +459,12 @@ class ProxmoxClient:
             }
 
             logger.info(f"Début de l'envoi de l'ISO '{filename}' vers Proxmox ({node}/{storage})...")
-            # On utilise requests.post directement
+            # On appelle directement requests.Session.request pour éviter la résolution dynamique vers ProxmoxHttpSession.request
+            session = self.api._backend.get_session()
             response = await asyncio.to_thread(
-                requests.post,
+                requests.Session.request,
+                session,
+                "POST",
                 url,
                 headers=headers,
                 data=data,

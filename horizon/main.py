@@ -47,9 +47,9 @@ async def lifespan(app: FastAPI):
                 # 2.1 Fix Node Mappings (rem, ram, emilia)
                 # Correct stale mappings like 'pve-rem' that cause hostname lookup failures
                 node_mappings = {
-                    PhysicalNode.REM: "rem",
-                    PhysicalNode.RAM: "ram",
-                    PhysicalNode.EMILIA: "emilia",
+                    PhysicalNode.REM: "pve",
+                    PhysicalNode.RAM: "pve",
+                    PhysicalNode.EMILIA: "pve",
                 }
                 logger.info("Validation des mappings de nœuds Proxmox...")
                 for p_node, px_name in node_mappings.items():
