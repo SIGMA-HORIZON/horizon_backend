@@ -12,7 +12,7 @@ def check_nodes():
             print("Proxmox client is not enabled.")
             return
 
-        nodes = client._api.nodes.get()
+        nodes = client.api.nodes.get()
         print(f"\n{'Node':<15} | {'Status':<10} | {'CPU':<5} | {'Memory (GB)':<10}")
         print("-" * 50)
         for n in nodes:
@@ -22,7 +22,7 @@ def check_nodes():
         for n in nodes:
             node_name = n.get('node')
             print(f"\nVMs on node {node_name}:")
-            vms = client._api.nodes(node_name).qemu.get()
+            vms = client.api.nodes(node_name).qemu.get()
             if not vms:
                 print("  No VMs found.")
             for v in vms:

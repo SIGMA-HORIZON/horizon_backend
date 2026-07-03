@@ -1,6 +1,11 @@
 
 import sys
 import os
+# Add project root to path
+_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
+if _ROOT not in sys.path:
+    sys.path.insert(0, _ROOT)
+
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 from horizon.shared.models import IsoProxmoxTemplate, ISOImage
@@ -29,7 +34,11 @@ def sync_templates():
         
         for node in nodes:
             node_name = node['node']
-            vms = client.api.nodes(node_name).qemu.get()
+            try:
+                vms = client.api.nodes(node_name).qemu.get()
+            except Exception as node_err:
+                print(f"Skipping node {node_name} due to error: {node_err}")
+                continue
             
             for vm in vms:
                 is_template = vm.get('template') == 1
