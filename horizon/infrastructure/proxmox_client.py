@@ -198,7 +198,7 @@ class ProxmoxClient:
             await self.wait_for_task(src_node, upid, timeout=900)
 
             # Build config params
-            config_params = {"memory": memory_mb, "cores": cores, "net0": net0, "agent": "1"}
+            config_params = {"memory": memory_mb, "cores": cores, "net0": net0, "agent": "1", "ipconfig0": "ip=dhcp"}
             if ssh_key:
                 parts = ssh_key.strip().split()
                 clean_key = f"{parts[0]} {parts[1]}" if len(parts) >= 2 else ssh_key.strip()

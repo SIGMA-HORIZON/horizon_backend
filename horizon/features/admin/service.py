@@ -456,17 +456,18 @@ async def prepare_vm_template(db: Session, body: schemas.PrepareTemplateRequest)
     _require_proxmox_enabled()
     try:
         client = ProxmoxClient()
+        s = get_settings()
         # On prépare la VM sur Proxmox
         res = await client.prepare_vm_for_template(
             node=body.node,
             vmid=body.vmid,
-            storage=body.storage,
+            storage=body.storage or s.PROXMOX_VM_STORAGE,
             iso_filename=body.iso_filename,
             name=body.name,
             vcpu=body.vcpu,
             ram_mb=body.ram_mb,
             storage_gb=body.storage_gb,
-            iso_storage=body.iso_storage
+            iso_storage=body.iso_storage or s.PROXMOX_ISO_STORAGE
         )
         
         # On enregistre automatiquement le template dans la base de données
